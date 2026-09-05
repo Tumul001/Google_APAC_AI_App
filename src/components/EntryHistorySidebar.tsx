@@ -11,8 +11,11 @@ import {
   Heart,
   ChevronRight,
   Filter,
+  MapPin,
+  Share2,
 } from 'lucide-react';
 import type { JournalEntry, JournalMode } from '../types';
+import { LocationPreview } from './LocationPreview';
 
 interface EntryHistorySidebarProps {
   entries: JournalEntry[];
@@ -56,7 +59,8 @@ export const EntryHistorySidebar: React.FC<EntryHistorySidebarProps> = ({
       searchQuery.trim() === '' ||
       entry.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       entry.messages.some((m) => m.content.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (entry.summary && entry.summary.toLowerCase().includes(searchQuery.toLowerCase()));
+      (entry.summary && entry.summary.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (entry.location && entry.location.placeName.toLowerCase().includes(searchQuery.toLowerCase()));
 
     const matchesMode = selectedModeFilter === 'all' || entry.mode === selectedModeFilter;
 
@@ -290,9 +294,23 @@ export const EntryHistorySidebar: React.FC<EntryHistorySidebarProps> = ({
                   </p>
                 )}
 
+                {/* Location Map Preview for tagged entries */}
+                {entry.location && (
+                  <LocationPreview location={entry.location} variant="compact" />
+                )}
+
                 <div className="mt-2 flex items-center justify-between text-[10px] text-stone-400">
                   <span>{formatDate(entry.updatedAt)}</span>
                   <div className="flex items-center gap-1.5">
+                    {entry.sharedWithCoach && (
+                      <span
+                        className="inline-flex items-center gap-0.5 rounded bg-indigo-50 px-1.5 py-0.5 text-[9px] font-medium text-indigo-700 border border-indigo-200"
+                        title="Shared with Coach"
+                      >
+                        <Share2 className="h-2.5 w-2.5" />
+                        Coach
+                      </span>
+                    )}
                     {entry.summary && (
                       <span className="rounded bg-amber-50 px-1 py-0.2 text-[9px] font-medium text-amber-700 border border-amber-200">
                         AI Summary

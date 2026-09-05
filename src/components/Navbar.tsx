@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookOpen, LogOut, Plus, ShieldCheck, User } from 'lucide-react';
+import { BookOpen, LogOut, Plus, ShieldCheck, User, ShieldAlert } from 'lucide-react';
 import type { UserProfile } from '../types';
 
 interface NavbarProps {
@@ -7,6 +7,9 @@ interface NavbarProps {
   onSignOut: () => void;
   onNewEntry: () => void;
   onOpenThreatModel: () => void;
+  currentRoute?: string;
+  onNavigateToAdmin?: () => void;
+  onNavigateHome?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -14,6 +17,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSignOut,
   onNewEntry,
   onOpenThreatModel,
+  currentRoute = '/',
+  onNavigateToAdmin,
+  onNavigateHome,
 }) => {
   return (
     <header className="sticky top-0 z-30 border-b border-stone-200/80 bg-stone-50/90 backdrop-blur-md">
@@ -47,6 +53,30 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {user && (
             <>
+              {user.isAdmin && (
+                currentRoute === '/admin' ? (
+                  <button
+                    id="back-to-journal-btn"
+                    onClick={onNavigateHome}
+                    className="flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-900 shadow-2xs hover:bg-indigo-100 transition-colors"
+                    title="Return to Personal Reflections"
+                  >
+                    <BookOpen className="h-3.5 w-3.5 text-indigo-700" />
+                    <span>My Journal</span>
+                  </button>
+                ) : (
+                  <button
+                    id="admin-coach-btn"
+                    onClick={onNavigateToAdmin}
+                    className="flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-800 shadow-2xs hover:bg-indigo-100 transition-colors"
+                    title="Access Coach/Admin Dashboard"
+                  >
+                    <ShieldAlert className="h-3.5 w-3.5 text-indigo-700" />
+                    <span className="hidden sm:inline">Coach Review</span>
+                  </button>
+                )
+              )}
+
               <button
                 id="new-entry-header-btn"
                 onClick={onNewEntry}

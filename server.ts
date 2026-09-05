@@ -13,12 +13,13 @@ const PORT = 3000;
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Resilient Model Fallback Ladder
+// Resilient Model Fallback Ladder (ordered by availability and latency per protocol)
 const MODEL_FALLBACK_LADDER = [
   'gemini-3.6-flash',
   'gemini-3.1-flash-lite',
   'gemini-flash-latest',
   'gemini-3.7-flash',
+  'gemini-3.8-flash',
 ];
 
 let genAIClient: GoogleGenAI | null = null;
@@ -89,25 +90,30 @@ Summarize the core themes, emotional tone, key realizations, and actionable next
         modelUsed: modelName,
       };
     } catch (err: any) {
-      console.warn(`[Gemini] Model ${modelName} failed:`, err?.message || err);
       lastError = err;
-
       const statusCode = err?.status || err?.statusCode || 0;
+      const errorMsg = err?.message || String(err);
       const isRecoverable =
         statusCode === 503 ||
         statusCode === 429 ||
         statusCode === 404 ||
         statusCode === 500 ||
-        (err?.message && (
-          err.message.includes('503') ||
-          err.message.includes('429') ||
-          err.message.includes('RESOURCE_EXHAUSTED') ||
-          err.message.includes('UNAVAILABLE') ||
-          err.message.includes('NOT_FOUND')
-        ));
+        errorMsg.includes('503') ||
+        errorMsg.includes('429') ||
+        errorMsg.includes('RESOURCE_EXHAUSTED') ||
+        errorMsg.includes('UNAVAILABLE') ||
+        errorMsg.includes('high demand') ||
+        errorMsg.includes('NOT_FOUND');
 
-      if (!isRecoverable && MODEL_FALLBACK_LADDER.indexOf(modelName) === MODEL_FALLBACK_LADDER.length - 1) {
-        throw err;
+      const isLastModel = MODEL_FALLBACK_LADDER.indexOf(modelName) === MODEL_FALLBACK_LADDER.length - 1;
+
+      if (isRecoverable && !isLastModel) {
+        console.log(`[Gemini] Model ${modelName} temporary demand/availability spike (${statusCode || 'recovering'}). Stepping to next model in fallback ladder...`);
+      } else {
+        console.warn(`[Gemini] Model ${modelName} encountered error:`, errorMsg);
+        if (!isRecoverable && isLastModel) {
+          throw err;
+        }
       }
     }
   }
@@ -215,7 +221,10 @@ Provide a concise, thoughtful breakdown with:
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: false,
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);

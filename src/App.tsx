@@ -1,14 +1,19 @@
 import React, { useState, useEffect } from 'react';
+import { APIProvider } from '@vis.gl/react-google-maps';
 import {
   signInWithGoogle,
   signOut as appSignOut,
   subscribeToAuthChanges,
+  forceRefreshToken,
 } from './lib/firebase';
 import { Navbar } from './components/Navbar';
 import { LandingPage } from './components/LandingPage';
 import { Dashboard } from './components/Dashboard';
+import { AdminDashboard } from './components/AdminDashboard';
 import { ThreatModelModal } from './components/ThreatModelModal';
 import type { UserProfile } from './types';
+
+const GOOGLE_MAPS_API_KEY = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) || '';
 
 export default function App() {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -16,15 +21,43 @@ export default function App() {
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isThreatModelOpen, setIsThreatModelOpen] = useState(false);
+  const [currentPath, setCurrentPath] = useState<string>(
+    typeof window !== 'undefined' ? window.location.pathname : '/'
+  );
+
+  // Sync browser back/forward and path changes
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigateTo = async (path: string) => {
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', path);
+      setCurrentPath(path);
+    }
+    if (path === '/admin') {
+      try {
+        const { isAdmin } = await forceRefreshToken();
+        setUser((prev) => (prev ? { ...prev, isAdmin } : prev));
+      } catch (err) {
+        console.error('Failed to force refresh token on navigateTo /admin:', err);
+      }
+    }
+  };
 
   useEffect(() => {
-    const unsubscribe = subscribeToAuthChanges((firebaseUser) => {
+    const unsubscribe = subscribeToAuthChanges((firebaseUser, isAdmin) => {
       if (firebaseUser) {
         setUser({
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
           photoURL: firebaseUser.photoURL,
+          isAdmin: isAdmin,
         });
       } else {
         setUser(null);
@@ -34,6 +67,19 @@ export default function App() {
 
     return () => unsubscribe();
   }, []);
+
+  // Route Guard: Non-admin users hitting /admin route -> quietly redirected to / without error leak
+  useEffect(() => {
+    if (!isAuthLoading) {
+      if (currentPath === '/admin' && (!user || !user.isAdmin)) {
+        // Silently replace history state back to '/'
+        if (typeof window !== 'undefined') {
+          window.history.replaceState({}, '', '/');
+          setCurrentPath('/');
+        }
+      }
+    }
+  }, [currentPath, user, isAuthLoading]);
 
   const handleSignIn = async () => {
     setIsSigningIn(true);
@@ -76,35 +122,48 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-stone-50 text-stone-900 font-sans">
-      <Navbar
-        user={user}
-        onSignOut={handleSignOut}
-        onNewEntry={() => {
-          // When clicking New Journal from navbar, if user is logged in, Dashboard handles state or triggers refresh
-          const newEntryBtn = document.getElementById('sidebar-new-entry-btn');
-          if (newEntryBtn) {
-            newEntryBtn.click();
-          }
-        }}
-        onOpenThreatModel={() => setIsThreatModelOpen(true)}
-      />
-
-      {user ? (
-        <Dashboard user={user} />
-      ) : (
-        <LandingPage
-          onSignIn={handleSignIn}
-          isLoading={isSigningIn}
-          errorMessage={authError}
+    <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
+      <div className="min-h-screen flex flex-col bg-stone-50 text-stone-900 font-sans">
+        <Navbar
+          user={user}
+          onSignOut={handleSignOut}
+          currentRoute={currentPath}
+          onNavigateToAdmin={() => navigateTo('/admin')}
+          onNavigateHome={() => navigateTo('/')}
+          onNewEntry={() => {
+            if (currentPath === '/admin') {
+              navigateTo('/');
+            }
+            setTimeout(() => {
+              const newEntryBtn = document.getElementById('sidebar-new-entry-btn');
+              if (newEntryBtn) {
+                newEntryBtn.click();
+              }
+            }, 50);
+          }}
           onOpenThreatModel={() => setIsThreatModelOpen(true)}
         />
-      )}
 
-      <ThreatModelModal
-        isOpen={isThreatModelOpen}
-        onClose={() => setIsThreatModelOpen(false)}
-      />
-    </div>
+        {user ? (
+          currentPath === '/admin' && user.isAdmin ? (
+            <AdminDashboard user={user} onNavigateHome={() => navigateTo('/')} />
+          ) : (
+            <Dashboard user={user} />
+          )
+        ) : (
+          <LandingPage
+            onSignIn={handleSignIn}
+            isLoading={isSigningIn}
+            errorMessage={authError}
+            onOpenThreatModel={() => setIsThreatModelOpen(true)}
+          />
+        )}
+
+        <ThreatModelModal
+          isOpen={isThreatModelOpen}
+          onClose={() => setIsThreatModelOpen(false)}
+        />
+      </div>
+    </APIProvider>
   );
 }

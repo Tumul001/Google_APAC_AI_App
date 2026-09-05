@@ -1,6 +1,8 @@
 {
   "name": "Gemini Journal & Reflections",
   "description": "User-authenticated personal journaling and reflection assistant powered by Gemini 3.6 Flash and user-isolated Firestore storage.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": [
+    "geolocation"
+  ],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

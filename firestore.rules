@@ -1,14 +1,33 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // User-isolated interactions and journal entries
+    // User-isolated interactions and journal entries with explicit opt-in Coach Sharing
     match /users/{userId}/interactions/{interactionId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && (
+        request.auth.uid == userId
+        || (request.auth.token.admin == true && resource.data.sharedWithCoach == true)
+      );
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Collection Group rule for interactions (Mandatory for collectionGroup('interactions') queries)
+    match /{path=**}/interactions/{interactionId} {
+      allow read: if request.auth != null && (
+        request.auth.uid == resource.data.userId
+        || (request.auth.token.admin == true && resource.data.sharedWithCoach == true)
+      );
     }
     
     // User profiles
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Admin Audit Logs: Write-only by authenticated admins or server, read-only by admins
+    match /admin_audit_logs/{logId} {
+      allow read: if request.auth != null && request.auth.token.admin == true;
+      allow create: if request.auth != null && request.auth.token.admin == true && request.resource.data.adminUid == request.auth.uid;
+      allow update, delete: if false; // Immutable audit trail
     }
   }
 }

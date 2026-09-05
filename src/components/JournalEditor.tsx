@@ -18,8 +18,13 @@ import {
   ChevronUp,
   Layers,
   Menu,
+  MapPin,
+  Share2,
+  Shield,
 } from 'lucide-react';
-import type { JournalEntry, JournalMode, ChatMessage, SaveStatus } from '../types';
+import type { JournalEntry, JournalMode, ChatMessage, SaveStatus, EntryLocation } from '../types';
+import { LocationPickerModal } from './LocationPickerModal';
+import { LocationPreview } from './LocationPreview';
 
 interface JournalEditorProps {
   entry: JournalEntry;
@@ -77,6 +82,7 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
   const [isSummaryCopied, setIsSummaryCopied] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState(entry.title);
+  const [isLocationPickerOpen, setIsLocationPickerOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -112,6 +118,32 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
     onUpdateEntry({
       ...entry,
       mode: newMode,
+      updatedAt: Date.now(),
+    });
+  };
+
+  const handleSaveLocation = (loc: EntryLocation) => {
+    onUpdateEntry({
+      ...entry,
+      location: loc,
+      updatedAt: Date.now(),
+    });
+  };
+
+  const handleRemoveLocation = () => {
+    const updated = { ...entry };
+    delete updated.location;
+    onUpdateEntry({
+      ...updated,
+      updatedAt: Date.now(),
+    });
+  };
+
+  const handleToggleShareWithCoach = () => {
+    const nextSharedState = !entry.sharedWithCoach;
+    onUpdateEntry({
+      ...entry,
+      sharedWithCoach: nextSharedState,
       updatedAt: Date.now(),
     });
   };
@@ -278,12 +310,65 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
             <Sparkles className="h-3.5 w-3.5 text-amber-600" />
             <span className="hidden sm:inline">{isGeneratingSummary ? 'Summarizing...' : 'Summarize'}</span>
           </button>
+
+          {/* Location Action */}
+          {entry.location ? (
+            <button
+              id="edit-location-btn"
+              onClick={() => setIsLocationPickerOpen(true)}
+              className="flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50/70 px-2.5 py-1.5 text-xs font-medium text-rose-800 shadow-2xs hover:bg-rose-100/80 transition-colors cursor-pointer max-w-[160px] sm:max-w-[200px]"
+              title={`Tagged at: ${entry.location.placeName}. Click to change.`}
+            >
+              <MapPin className="h-3.5 w-3.5 text-rose-600 shrink-0" />
+              <span className="truncate">{entry.location.placeName}</span>
+            </button>
+          ) : (
+            <button
+              id="add-location-btn"
+              onClick={() => setIsLocationPickerOpen(true)}
+              className="flex items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 shadow-2xs hover:bg-stone-50 transition-colors cursor-pointer"
+              title="Add location tag to this entry"
+            >
+              <MapPin className="h-3.5 w-3.5 text-stone-500" />
+              <span className="hidden sm:inline">Add Location</span>
+            </button>
+          )}
+
+          {/* Share with Coach Opt-In Toggle (Default OFF) */}
+          <button
+            id="share-with-coach-toggle-btn"
+            type="button"
+            onClick={handleToggleShareWithCoach}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium border transition-colors cursor-pointer shadow-2xs ${
+              entry.sharedWithCoach
+                ? 'border-indigo-300 bg-indigo-50 text-indigo-800 hover:bg-indigo-100/80'
+                : 'border-stone-300 bg-white text-stone-700 hover:bg-stone-50'
+            }`}
+            title={
+              entry.sharedWithCoach
+                ? 'Shared with Coach (Admin View). Click to unshare.'
+                : 'Private to you only (Default OFF). Click to opt into sharing with Coach.'
+            }
+          >
+            <Share2 className={`h-3.5 w-3.5 ${entry.sharedWithCoach ? 'text-indigo-600' : 'text-stone-400'}`} />
+            <span>{entry.sharedWithCoach ? 'Shared with Coach' : 'Share with Coach'}</span>
+          </button>
         </div>
       </div>
 
       {/* Messages Workspace */}
       <div className="flex-1 overflow-y-auto px-4 pt-4 pb-2 sm:px-6">
         <div className="mx-auto max-w-3xl space-y-4">
+          {/* Location Map Preview in Editor (if tagged) */}
+          {entry.location && (
+            <LocationPreview
+              location={entry.location}
+              variant="editor"
+              onChangeLocation={() => setIsLocationPickerOpen(true)}
+              onRemove={handleRemoveLocation}
+            />
+          )}
+
           {/* AI Summary Highlight Card (Inline at top of conversation stream) */}
           {entry.summary && (
             <div className="rounded-2xl border border-amber-200/90 bg-amber-50/70 p-5 shadow-2xs transition-all">
@@ -494,6 +579,14 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
           </div>
         </form>
       </div>
+
+      {/* Location Picker Modal */}
+      <LocationPickerModal
+        isOpen={isLocationPickerOpen}
+        onClose={() => setIsLocationPickerOpen(false)}
+        onSelectLocation={handleSaveLocation}
+        currentLocation={entry.location}
+      />
     </div>
   );
 };

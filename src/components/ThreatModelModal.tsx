@@ -50,6 +50,24 @@ export const ThreatModelModal: React.FC<ThreatModelModalProps> = ({ isOpen, onCl
         'Firebase Google OAuth popup authentication (no plain passwords handled or stored), HTTPS in-transit encryption, and scoped token isolation.',
       status: 'Protected',
     },
+    {
+      zone: '6. Google Maps & Geolocation',
+      icon: <ShieldCheck className="h-4 w-4 text-rose-600" />,
+      threats:
+        'Maps API key exposure/quota theft, SSRF, unauthorized geolocation tracking, malformed/spoofed coordinates injection.',
+      countermeasures:
+        'HTTP referrer domain restriction + API scope lockdown (Maps JS + Places API New); explicit opt-in browser GPS permission prompt; client/server key separation; strict lat/lng numeric bounds validation (-90..90, -180..180) prior to Firestore persistence.',
+      status: 'Protected',
+    },
+    {
+      zone: '7. Admin Role & RBAC (Coach View)',
+      icon: <ShieldAlert className="h-4 w-4 text-indigo-600" />,
+      threats:
+        'Privilege escalation via forged role claims, horizontal data leakage, unauthorized coach entry snooping, missing audit trail.',
+      countermeasures:
+        'Dual-condition Firestore rules check (request.auth.token.admin == true && resource.data.sharedWithCoach == true); opt-in per-entry sharing; server-side custom claim verification; silent /admin route redirection with zero route existence leak; immutable append-only admin_audit_logs.',
+      status: 'Protected',
+    },
   ];
 
   return (
