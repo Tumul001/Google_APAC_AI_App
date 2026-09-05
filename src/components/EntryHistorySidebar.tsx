@@ -45,7 +45,7 @@ export const EntryHistorySidebar: React.FC<EntryHistorySidebarProps> = ({
       case 'brainstorm':
         return <Lightbulb className="h-3.5 w-3.5 text-amber-600" />;
       case 'deep_thinking':
-        return <Sparkles className="h-3.5 w-3.5 text-indigo-600" />;
+        return <Sparkles className="h-3.5 w-3.5 text-stone-700" />;
       case 'gratitude':
         return <Heart className="h-3.5 w-3.5 text-rose-500" />;
       case 'reflection':
@@ -304,7 +304,7 @@ export const EntryHistorySidebar: React.FC<EntryHistorySidebarProps> = ({
                   <div className="flex items-center gap-1.5">
                     {entry.sharedWithCoach && (
                       <span
-                        className="inline-flex items-center gap-0.5 rounded bg-indigo-50 px-1.5 py-0.5 text-[9px] font-medium text-indigo-700 border border-indigo-200"
+                        className="inline-flex items-center gap-0.5 rounded bg-stone-100 px-1.5 py-0.5 text-[9px] font-medium text-stone-700 border border-stone-200"
                         title="Shared with Coach"
                       >
                         <Share2 className="h-2.5 w-2.5" />

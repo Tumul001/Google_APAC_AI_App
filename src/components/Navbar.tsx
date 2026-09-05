@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookOpen, LogOut, Plus, ShieldCheck, User, ShieldAlert } from 'lucide-react';
+import { BookOpen, LogOut, Plus, ShieldCheck, User, ShieldAlert, Settings } from 'lucide-react';
 import type { UserProfile } from '../types';
 
 interface NavbarProps {
@@ -7,6 +7,7 @@ interface NavbarProps {
   onSignOut: () => void;
   onNewEntry: () => void;
   onOpenThreatModel: () => void;
+  onOpenSettings?: () => void;
   currentRoute?: string;
   onNavigateToAdmin?: () => void;
   onNavigateHome?: () => void;
@@ -17,6 +18,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSignOut,
   onNewEntry,
   onOpenThreatModel,
+  onOpenSettings,
   currentRoute = '/',
   onNavigateToAdmin,
   onNavigateHome,
@@ -41,10 +43,22 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         <div className="flex items-center space-x-2 sm:space-x-3">
+          {onOpenSettings && user && (
+            <button
+              id="settings-btn"
+              onClick={onOpenSettings}
+              className="flex items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 shadow-2xs hover:bg-stone-50 transition-colors cursor-pointer"
+              title="Configure Slack Notifications & Settings"
+            >
+              <Settings className="h-3.5 w-3.5 text-stone-600" />
+              <span className="hidden sm:inline">Settings</span>
+            </button>
+          )}
+
           <button
             id="threat-model-btn"
             onClick={onOpenThreatModel}
-            className="flex items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 shadow-2xs hover:bg-stone-50 transition-colors"
+            className="flex items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 shadow-2xs hover:bg-stone-50 transition-colors cursor-pointer"
             title="View Security Threat Model & Protections"
           >
             <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
@@ -58,20 +72,20 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <button
                     id="back-to-journal-btn"
                     onClick={onNavigateHome}
-                    className="flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-900 shadow-2xs hover:bg-indigo-100 transition-colors"
+                    className="flex items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-800 shadow-2xs hover:bg-stone-50 transition-colors cursor-pointer"
                     title="Return to Personal Reflections"
                   >
-                    <BookOpen className="h-3.5 w-3.5 text-indigo-700" />
+                    <BookOpen className="h-3.5 w-3.5 text-stone-700" />
                     <span>My Journal</span>
                   </button>
                 ) : (
                   <button
                     id="admin-coach-btn"
                     onClick={onNavigateToAdmin}
-                    className="flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-800 shadow-2xs hover:bg-indigo-100 transition-colors"
+                    className="flex items-center gap-1.5 rounded-lg border border-stone-300 bg-stone-100/90 px-3 py-1.5 text-xs font-semibold text-stone-800 shadow-2xs hover:bg-stone-200/80 transition-colors cursor-pointer"
                     title="Access Coach/Admin Dashboard"
                   >
-                    <ShieldAlert className="h-3.5 w-3.5 text-indigo-700" />
+                    <ShieldAlert className="h-3.5 w-3.5 text-stone-700" />
                     <span className="hidden sm:inline">Coach Review</span>
                   </button>
                 )

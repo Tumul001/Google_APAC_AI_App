@@ -32,12 +32,19 @@ export interface JournalEntry {
   updatedAt: number;
 }
 
+export interface NotificationSettings {
+  slackEnabled: boolean;
+  slackTriggerModes: JournalMode[];
+  updatedAt?: number;
+}
+
 export interface UserProfile {
   uid: string;
   email: string | null;
   displayName: string | null;
   photoURL: string | null;
   isAdmin?: boolean;
+  notificationSettings?: NotificationSettings;
 }
 
 export interface AdminAuditLog {

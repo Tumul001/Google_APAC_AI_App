@@ -12,6 +12,7 @@ import {
   collection,
   collectionGroup,
   doc,
+  getDoc,
   setDoc,
   deleteDoc,
   onSnapshot,
@@ -22,7 +23,7 @@ import {
   addDoc,
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
-import type { JournalEntry, EntryLocation, AdminAuditLog } from '../types';
+import type { JournalEntry, EntryLocation, AdminAuditLog, NotificationSettings } from '../types';
 
 // Initialize Firebase App singleton
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
@@ -311,3 +312,166 @@ export async function logAdminEntryView(log: AdminAuditLog): Promise<void> {
     console.error('Failed to log admin entry view in admin_audit_logs:', error);
   }
 }
+
+/**
+ * Retrieve user notification preferences from Firestore /users/{userId}
+ */
+export async function getUserNotificationSettings(userId: string): Promise<NotificationSettings> {
+  const defaultSettings: NotificationSettings = {
+    slackEnabled: false,
+    slackTriggerModes: ['gratitude', 'deep_thinking'],
+  };
+
+  if (!userId) return defaultSettings;
+
+  try {
+    const userDocRef = doc(db, 'users', userId);
+    const snap = await getDoc(userDocRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data?.notificationSettings) {
+        return {
+          slackEnabled: Boolean(data.notificationSettings.slackEnabled),
+          slackTriggerModes: Array.isArray(data.notificationSettings.slackTriggerModes)
+            ? data.notificationSettings.slackTriggerModes
+            : ['gratitude', 'deep_thinking'],
+          updatedAt: data.notificationSettings.updatedAt,
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('Could not read notificationSettings from Firestore:', err);
+  }
+  return defaultSettings;
+}
+
+/**
+ * Real-time subscription to user notification preferences from Firestore /users/{userId}
+ */
+export function subscribeToUserNotificationSettings(
+  userId: string,
+  onData: (settings: NotificationSettings) => void
+): () => void {
+  const defaultSettings: NotificationSettings = {
+    slackEnabled: false,
+    slackTriggerModes: ['gratitude', 'deep_thinking'],
+  };
+
+  if (!userId) return () => {};
+
+  const userDocRef = doc(db, 'users', userId);
+  return onSnapshot(
+    userDocRef,
+    (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data?.notificationSettings) {
+          onData({
+            slackEnabled: Boolean(data.notificationSettings.slackEnabled),
+            slackTriggerModes: Array.isArray(data.notificationSettings.slackTriggerModes)
+              ? data.notificationSettings.slackTriggerModes
+              : ['gratitude', 'deep_thinking'],
+            updatedAt: data.notificationSettings.updatedAt,
+          });
+          return;
+        }
+      }
+      onData(defaultSettings);
+    },
+    (err) => {
+      console.warn('[subscribeToUserNotificationSettings] Snapshot error:', err);
+    }
+  );
+}
+
+/**
+ * Save user notification preferences to Firestore /users/{userId}
+ */
+export async function saveUserNotificationSettings(
+  userId: string,
+  settings: NotificationSettings
+): Promise<void> {
+  if (!userId) {
+    throw new Error('User ID is required to save notification preferences.');
+  }
+  const userDocRef = doc(db, 'users', userId);
+  const payload = sanitizePayload({
+    notificationSettings: {
+      slackEnabled: Boolean(settings.slackEnabled),
+      slackTriggerModes: settings.slackTriggerModes,
+      updatedAt: Date.now(),
+    },
+  });
+  await setDoc(userDocRef, payload, { merge: true });
+}
+
+/**
+ * Dispatches a server-side notification to Slack via Cloud Run backend route.
+ * Strictly invoked only AFTER a confirmed Firestore document write.
+ */
+export async function triggerSlackNotification(params: {
+  entryId: string;
+  entryTitle: string;
+  mode: string;
+  excerpt: string;
+  userId: string;
+  modeTransition?: boolean;
+}): Promise<{ success: boolean; skipped?: boolean; error?: string }> {
+  try {
+    const res = await fetch('/api/notifications/slack', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok && !data.skipped) {
+      return {
+        success: false,
+        error: data.error || `HTTP ${res.status}: Failed to dispatch notification.`,
+      };
+    }
+    return {
+      success: Boolean(data.success),
+      skipped: Boolean(data.skipped),
+      error: data.error,
+    };
+  } catch (err: any) {
+    console.warn('[triggerSlackNotification] Network error communicating with backend:', err);
+    return { success: false, error: err?.message || 'Network error dispatching notification.' };
+  }
+}
+
+/**
+ * Sends a test ping to Slack via Cloud Run backend route to verify Secret Manager setup.
+ */
+export async function testSlackWebhook(): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    const res = await fetch('/api/notifications/slack/test', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return {
+        success: false,
+        error: data.error || `HTTP ${res.status}: Verification failed.`,
+      };
+    }
+    return {
+      success: true,
+      message: data.message || 'Test message received by Slack!',
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Failed to reach server test endpoint.',
+    };
+  }
+}
+

@@ -341,7 +341,7 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
             onClick={handleToggleShareWithCoach}
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium border transition-colors cursor-pointer shadow-2xs ${
               entry.sharedWithCoach
-                ? 'border-indigo-300 bg-indigo-50 text-indigo-800 hover:bg-indigo-100/80'
+                ? 'border-stone-400 bg-stone-100 text-stone-900 font-semibold hover:bg-stone-200/80'
                 : 'border-stone-300 bg-white text-stone-700 hover:bg-stone-50'
             }`}
             title={
@@ -350,7 +350,7 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
                 : 'Private to you only (Default OFF). Click to opt into sharing with Coach.'
             }
           >
-            <Share2 className={`h-3.5 w-3.5 ${entry.sharedWithCoach ? 'text-indigo-600' : 'text-stone-400'}`} />
+            <Share2 className={`h-3.5 w-3.5 ${entry.sharedWithCoach ? 'text-stone-800' : 'text-stone-400'}`} />
             <span>{entry.sharedWithCoach ? 'Shared with Coach' : 'Share with Coach'}</span>
           </button>
         </div>

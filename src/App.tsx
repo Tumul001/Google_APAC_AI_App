@@ -11,6 +11,7 @@ import { LandingPage } from './components/LandingPage';
 import { Dashboard } from './components/Dashboard';
 import { AdminDashboard } from './components/AdminDashboard';
 import { ThreatModelModal } from './components/ThreatModelModal';
+import { SettingsModal } from './components/SettingsModal';
 import type { UserProfile } from './types';
 
 const GOOGLE_MAPS_API_KEY = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) || '';
@@ -21,6 +22,7 @@ export default function App() {
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isThreatModelOpen, setIsThreatModelOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [currentPath, setCurrentPath] = useState<string>(
     typeof window !== 'undefined' ? window.location.pathname : '/'
   );
@@ -142,6 +144,7 @@ export default function App() {
             }, 50);
           }}
           onOpenThreatModel={() => setIsThreatModelOpen(true)}
+          onOpenSettings={() => setIsSettingsOpen(true)}
         />
 
         {user ? (
@@ -163,6 +166,14 @@ export default function App() {
           isOpen={isThreatModelOpen}
           onClose={() => setIsThreatModelOpen(false)}
         />
+
+        {user && (
+          <SettingsModal
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
+            user={user}
+          />
+        )}
       </div>
     </APIProvider>
   );

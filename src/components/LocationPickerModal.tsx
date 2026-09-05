@@ -258,13 +258,13 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/50 backdrop-blur-xs p-4">
       <div className="relative w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl border border-stone-200 animate-in fade-in zoom-in-95 duration-150">
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-rose-600">
+        <div className="flex items-center justify-between border-b border-stone-100 pb-3.5">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-stone-100 text-stone-700 border border-stone-200/80">
               <MapPin className="h-4 w-4" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-stone-900">Tag Location</h3>
+              <h3 className="text-sm font-semibold text-stone-900 font-sans">Tag Location</h3>
               <p className="text-[11px] text-stone-500">
                 Attach a location or place to your journal entry
               </p>
@@ -272,7 +272,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors"
+            className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
@@ -285,7 +285,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
             type="button"
             onClick={handleUseCurrentLocation}
             disabled={isLocating}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-stone-200 bg-stone-50/70 px-4 py-2.5 text-xs font-medium text-stone-800 hover:bg-stone-100 disabled:opacity-60 transition-colors cursor-pointer"
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-stone-200 bg-stone-50/80 px-4 py-2.5 text-xs font-medium text-stone-800 hover:bg-stone-100 disabled:opacity-60 transition-colors cursor-pointer"
           >
             {isLocating ? (
               <>
@@ -294,7 +294,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
               </>
             ) : (
               <>
-                <Navigation className="h-4 w-4 text-sky-600" />
+                <Navigation className="h-4 w-4 text-stone-700" />
                 <span>Use My Current Location</span>
               </>
             )}
@@ -302,7 +302,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
 
           <div className="relative flex items-center justify-center">
             <div className="w-full border-t border-stone-200" />
-            <span className="absolute bg-white px-2 text-[10px] uppercase tracking-wider text-stone-400">
+            <span className="absolute bg-white px-2 text-[10px] uppercase tracking-wider text-stone-400 font-mono">
               Or search by place
             </span>
           </div>
@@ -332,7 +332,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
                     <button
                       type="button"
                       onClick={() => handleDirectSearch()}
-                      className="rounded-lg bg-stone-100 px-2 py-1 text-[11px] font-medium text-stone-700 hover:bg-stone-200 transition-colors"
+                      className="rounded-lg bg-stone-100 px-2 py-1 text-[11px] font-medium text-stone-700 hover:bg-stone-200 transition-colors cursor-pointer"
                     >
                       Find
                     </button>
@@ -367,7 +367,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
             <div
               className={`flex items-center gap-2 rounded-lg p-2.5 text-xs ${
                 isError
-                  ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                  ? 'bg-red-50 text-red-700 border border-red-200'
                   : 'bg-stone-100 text-stone-700'
               }`}
             >
@@ -378,17 +378,17 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
 
           {/* Selected Location Preview */}
           {selectedLocation && (
-            <div className="rounded-xl border border-stone-200 bg-stone-50/50 p-3 space-y-2">
+            <div className="rounded-xl border border-stone-200 bg-stone-50/60 p-3 space-y-2">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-rose-100 text-rose-700 shrink-0">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-stone-900 text-stone-50 shrink-0">
                     <Check className="h-3.5 w-3.5" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold text-stone-900 truncate">
+                    <p className="text-xs font-semibold text-stone-900 truncate font-sans">
                       {selectedLocation.placeName}
                     </p>
-                    <p className="text-[10px] text-stone-400">
+                    <p className="text-[10px] text-stone-400 font-mono">
                       {selectedLocation.lat.toFixed(4)}°, {selectedLocation.lng.toFixed(4)}°
                     </p>
                   </div>
@@ -396,7 +396,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setSelectedLocation(null)}
-                  className="text-[11px] text-stone-400 hover:text-stone-700"
+                  className="text-[11px] font-medium text-stone-400 hover:text-stone-700 transition-colors cursor-pointer"
                 >
                   Clear
                 </button>
@@ -420,7 +420,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-100 transition-colors"
+            className="rounded-lg px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-100 transition-colors cursor-pointer"
           >
             Cancel
           </button>

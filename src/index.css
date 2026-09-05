@@ -7,8 +7,12 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  .font-sans {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "SF Pro", "San Francisco", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  }
+
   .font-serif {
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "San Francisco", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-family: "Newsreader", Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
   }
 }
 

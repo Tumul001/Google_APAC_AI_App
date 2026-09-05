@@ -156,27 +156,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
   });
 
   return (
-    <main className="flex-1 flex flex-col bg-stone-100 overflow-hidden">
+    <main className="flex-1 flex flex-col bg-stone-100/70 overflow-hidden">
       {/* Top Banner: Coach / Admin Scope Notice */}
-      <div className="border-b border-indigo-200/80 bg-indigo-50/90 px-4 py-2.5 sm:px-6">
+      <div className="border-b border-stone-200/80 bg-stone-50/90 px-4 py-3 sm:px-6 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 text-indigo-700 shrink-0" />
-            <span className="text-xs font-semibold text-indigo-900">
+            <ShieldCheck className="h-4 w-4 text-stone-800 shrink-0" />
+            <span className="text-xs font-semibold text-stone-900 font-sans">
               Coach Review Workspace (Role-Based Access Control)
             </span>
-            <span className="hidden md:inline-flex items-center rounded-full bg-indigo-200/70 px-2 py-0.5 text-[10px] font-medium text-indigo-800">
+            <span className="hidden md:inline-flex items-center rounded-full bg-stone-200/80 px-2 py-0.5 text-[10px] font-medium text-stone-700 font-mono">
               admin: true verified
             </span>
           </div>
 
           <div className="flex items-center gap-3 text-xs">
-            <span className="text-indigo-800/80 text-[11px] hidden sm:inline">
-              Only entries explicitly marked <strong className="font-semibold text-indigo-950">"Share with Coach"</strong> are visible here.
+            <span className="text-stone-500 text-[11px] hidden sm:inline">
+              Only entries explicitly marked <strong className="font-semibold text-stone-800">"Share with Coach"</strong> are visible here.
             </span>
             <button
               onClick={onNavigateHome}
-              className="flex items-center gap-1 rounded-md border border-indigo-300 bg-white px-2.5 py-1 text-xs font-medium text-indigo-800 shadow-2xs hover:bg-indigo-50 transition-colors"
+              className="flex items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 shadow-2xs hover:bg-stone-50 transition-colors cursor-pointer"
             >
               <ArrowLeft className="h-3 w-3" />
               <span>Back to Journal</span>
@@ -187,24 +187,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
 
       {accessError ? (
         <div className="flex flex-1 items-center justify-center p-6">
-          <div className="max-w-xl w-full rounded-2xl border border-red-200 bg-white p-6 text-center shadow-xs">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600 mb-3">
-              <Lock className="h-6 w-6" />
+          <div className="max-w-xl w-full rounded-2xl border border-stone-200 bg-white p-6 text-center shadow-xs">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-stone-100 text-stone-700 mb-3 border border-stone-200">
+              <Lock className="h-5 w-5" />
             </div>
-            <h3 className="text-base font-semibold text-stone-900">Access Restricted</h3>
-            <p className="mt-1.5 text-xs text-stone-600 leading-relaxed font-mono bg-red-50 p-2 rounded-lg border border-red-100 text-left overflow-x-auto break-all">
+            <h3 className="text-base font-semibold text-stone-900 font-serif">Access Restricted</h3>
+            <p className="mt-1.5 text-xs text-stone-600 leading-relaxed font-mono bg-stone-50 p-2.5 rounded-lg border border-stone-200 text-left overflow-x-auto break-all">
               {accessError}
             </p>
             {firestoreErrorCode && (
-              <p className="mt-1.5 text-[11px] text-red-500 font-mono text-left">
+              <p className="mt-1.5 text-[11px] text-red-600 font-mono text-left">
                 Firestore Error Code: {firestoreErrorCode}
               </p>
             )}
 
             {/* Diagnostic Token Claims Display */}
-            <div className="mt-3 text-left rounded-lg bg-stone-50 border border-stone-200 p-3">
+            <div className="mt-3 text-left rounded-xl bg-stone-50 border border-stone-200 p-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-stone-700">Decoded Token Claims</span>
+                <span className="text-xs font-semibold text-stone-800">Decoded Token Claims</span>
                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
                   decodedClaims?.admin ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
                 }`}>
@@ -214,25 +214,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
               <button
                 type="button"
                 onClick={() => setShowDiagnostics((prev) => !prev)}
-                className="mt-1 text-[11px] text-indigo-600 hover:underline cursor-pointer"
+                className="mt-1 text-[11px] text-stone-600 hover:text-stone-900 hover:underline cursor-pointer"
               >
                 {showDiagnostics ? 'Hide raw claims JSON' : 'Show raw claims JSON'}
               </button>
               {showDiagnostics && (
-                <pre className="mt-2 text-[10px] text-stone-600 bg-white p-2 rounded border border-stone-200 overflow-x-auto max-h-36 font-mono">
+                <pre className="mt-2 text-[10px] text-stone-600 bg-white p-2 rounded-lg border border-stone-200 overflow-x-auto max-h-36 font-mono">
                   {decodedClaims ? JSON.stringify(decodedClaims, null, 2) : 'No token claims received yet'}
                 </pre>
               )}
             </div>
 
-            <div className="mt-4 flex flex-col sm:flex-row items-center justify-center gap-2">
+            <div className="mt-5 flex flex-col sm:flex-row items-center justify-center gap-2">
               <button
                 id="refresh-admin-token-btn"
                 onClick={handleForceRefreshAndRetry}
                 disabled={isRefreshing}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3.5 py-2 text-xs font-semibold text-indigo-900 shadow-2xs hover:bg-indigo-100 transition-colors disabled:opacity-50 cursor-pointer"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3.5 py-2 text-xs font-medium text-stone-700 shadow-2xs hover:bg-stone-50 transition-colors disabled:opacity-50 cursor-pointer"
               >
-                <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin text-stone-600' : ''}`} />
                 <span>{isRefreshing ? 'Refreshing Token...' : 'Refresh Token & Retry'}</span>
               </button>
               <button
@@ -251,13 +251,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
             <div className="p-3.5 border-b border-stone-200/70 bg-stone-50/50">
               <div className="flex items-center justify-between gap-2 mb-2">
                 <div className="flex items-center gap-2">
-                  <Share2 className="h-4 w-4 text-indigo-600" />
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-stone-800">
+                  <Share2 className="h-4 w-4 text-stone-700" />
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-700 font-sans">
                     Shared Entries ({filteredEntries.length})
                   </h3>
                 </div>
                 {auditLogStatus && (
-                  <span className="text-[10px] text-indigo-600 animate-pulse font-medium">
+                  <span className="text-[10px] text-emerald-700 animate-pulse font-medium">
                     {auditLogStatus}
                   </span>
                 )}
@@ -278,10 +278,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
             </div>
 
             {/* Entries List */}
-            <div className="flex-1 overflow-y-auto p-2 space-y-2">
+            <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
               {isLoading ? (
                 <div className="flex flex-col items-center justify-center p-8 text-stone-400 gap-2">
-                  <RefreshCw className="h-5 w-5 animate-spin" />
+                  <RefreshCw className="h-5 w-5 animate-spin text-stone-400" />
                   <p className="text-xs">Loading shared client reflections...</p>
                 </div>
               ) : filteredEntries.length === 0 ? (
@@ -304,21 +304,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
                       onClick={() => handleSelectEntry(entry)}
                       className={`group rounded-xl p-3 text-left transition-all cursor-pointer border ${
                         isSelected
-                          ? 'border-indigo-500 bg-indigo-50/50 shadow-2xs'
+                          ? 'border-stone-900/40 bg-stone-100/90 shadow-2xs'
                           : 'border-stone-200/70 hover:border-stone-300 hover:bg-stone-50/80 bg-white'
                       }`}
                     >
                       <div className="flex items-center justify-between gap-1 mb-1">
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-700 bg-indigo-100/70 px-1.5 py-0.5 rounded">
-                          <UserCheck className="h-2.5 w-2.5" />
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-stone-700 bg-stone-100 border border-stone-200/70 px-1.5 py-0.5 rounded">
+                          <UserCheck className="h-2.5 w-2.5 text-stone-600" />
                           {anonymizedUser}
                         </span>
-                        <span className="text-[10px] text-stone-400">
+                        <span className="text-[10px] text-stone-400 font-sans">
                           {new Date(entry.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
                         </span>
                       </div>
 
-                      <h4 className="text-xs font-semibold text-stone-900 truncate">
+                      <h4 className="text-xs font-semibold text-stone-900 truncate font-sans">
                         {entry.title || 'Untitled Reflection'}
                       </h4>
 
@@ -332,7 +332,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
                         <span className="capitalize font-medium text-stone-600">{entry.mode}</span>
                         <div className="flex items-center gap-2">
                           {entry.location && (
-                            <span className="flex items-center gap-0.5 text-rose-700">
+                            <span className="flex items-center gap-0.5 text-stone-600">
                               <MapPin className="h-2.5 w-2.5" />
                               Tagged
                             </span>
@@ -355,18 +355,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
                 <div className="border-b border-stone-200 p-4 sm:px-6 flex items-start justify-between gap-3 bg-stone-50/50">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-800">
-                        <UserCheck className="h-3 w-3" />
+                      <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 border border-stone-200 px-2.5 py-0.5 text-xs font-semibold text-stone-800">
+                        <UserCheck className="h-3 w-3 text-stone-600" />
                         {getAnonymizedLabel(selectedEntry)}
                       </span>
                       <span className="text-xs text-stone-400 font-mono">
                         (Anonymized Client ID)
                       </span>
                     </div>
-                    <h2 className="text-base sm:text-lg font-bold text-stone-900 truncate">
+                    <h2 className="text-lg sm:text-xl font-semibold text-stone-900 truncate font-serif tracking-tight">
                       {selectedEntry.title}
                     </h2>
-                    <div className="flex items-center gap-2 text-xs text-stone-400 mt-1">
+                    <div className="flex items-center gap-2 text-xs text-stone-400 mt-1 font-sans">
                       <Calendar className="h-3.5 w-3.5" />
                       <span>{new Date(selectedEntry.createdAt).toLocaleString()}</span>
                       <span>•</span>
@@ -377,7 +377,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
                   </div>
 
                   <div className="shrink-0 flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1 text-[11px] text-stone-500 bg-stone-100 px-2 py-1 rounded border border-stone-200">
+                    <span className="inline-flex items-center gap-1 text-[11px] text-stone-600 bg-stone-100 px-2.5 py-1 rounded-lg border border-stone-200">
                       <Eye className="h-3 w-3 text-stone-400" />
                       Read-Only View
                     </span>
@@ -393,12 +393,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
 
                   {/* AI Summary Highlight */}
                   {selectedEntry.summary && (
-                    <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
-                      <div className="flex items-center gap-2 text-amber-900 font-serif font-semibold text-sm mb-1.5">
-                        <Sparkles className="h-4 w-4 text-amber-700" />
+                    <div className="rounded-xl border border-stone-200 bg-stone-50/70 p-4">
+                      <div className="flex items-center gap-2 text-stone-900 font-serif font-semibold text-sm mb-1.5">
+                        <Sparkles className="h-4 w-4 text-amber-600" />
                         AI Summary & Takeaways
                       </div>
-                      <div className="text-xs text-amber-950 prose prose-stone max-w-none leading-relaxed">
+                      <div className="text-xs text-stone-700 prose prose-stone max-w-none leading-relaxed">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
                           {selectedEntry.summary}
                         </ReactMarkdown>
@@ -408,7 +408,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
 
                   {/* Messages Conversation Stream */}
                   <div className="space-y-3">
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-stone-500">
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-stone-500 font-sans">
                       Conversation History ({selectedEntry.messages?.length || 0})
                     </h4>
 
@@ -419,18 +419,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
                           className={`rounded-xl p-3.5 text-xs ${
                             msg.role === 'user'
                               ? 'bg-stone-100 border border-stone-200/80 text-stone-900 ml-4'
-                              : 'bg-indigo-50/70 border border-indigo-100 text-stone-900 mr-4'
+                              : 'bg-stone-50 border border-stone-200 text-stone-800 mr-4'
                           }`}
                         >
                           <div className="flex items-center justify-between gap-2 mb-1.5">
-                            <span className="font-semibold capitalize text-stone-700 text-[11px]">
+                            <span className="font-semibold capitalize text-stone-800 text-[11px] font-sans">
                               {msg.role === 'user' ? 'Client Reflection' : 'AI Companion Response'}
                             </span>
                             <span className="text-[10px] text-stone-400">
                               {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
-                          <div className="prose prose-stone text-xs max-w-none leading-relaxed">
+                          <div className="prose prose-stone text-xs max-w-none leading-relaxed font-sans">
                             <ReactMarkdown remarkPlugins={[remarkGfm]}>
                               {msg.content}
                             </ReactMarkdown>
@@ -455,7 +455,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-stone-400">
                 <Eye className="h-10 w-10 stroke-1 text-stone-300 mb-2" />
-                <p className="text-sm font-medium text-stone-600">No Reflection Selected</p>
+                <p className="text-sm font-medium text-stone-600 font-serif">No Reflection Selected</p>
                 <p className="text-xs text-stone-400 max-w-xs mt-1">
                   Choose a shared entry from the list on the left to inspect the client reflection and location details.
                 </p>
