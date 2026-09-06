@@ -72,6 +72,13 @@
   --color-danger: var(--color-red-600);           /* errors, destructive */
   --color-insight: var(--color-amber-800);        /* AI summary */
   --color-place: var(--color-rose-600);           /* location */
+
+  /* Mood Flow bands. Warm for positive, cool for negative, stone between —
+     all pulled from ramps already in the product, so the chart reads as part
+     of the same world rather than a visualisation bolted onto it. */
+  --color-mood-positive: var(--color-amber-300);
+  --color-mood-neutral: var(--color-stone-300);
+  --color-mood-negative: var(--color-slate-300);
 }
 
 

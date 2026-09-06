@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { APIProvider } from '@vis.gl/react-google-maps';
 import {
+  saveEntrySentiment,
   saveJournalEntry,
   deleteJournalEntry,
   subscribeToUserEntries,
@@ -10,20 +11,23 @@ import {
 } from '../lib/firestore';
 import { requestGeminiReflection, requestGeminiSummary, streamGeminiReflection } from '../lib/geminiApi';
 import { EntryHistorySidebar } from './EntryHistorySidebar';
+import { MoodFlow } from './MoodFlow';
 import { JournalEditor } from './JournalEditor';
 import { AlertCircle, CheckCircle2, X, Bell } from 'lucide-react';
-import type { UserProfile, JournalEntry, ChatMessage, SaveStatus, JournalMode, NotificationSettings } from '../types';
+import type { UserProfile, JournalEntry, ChatMessage, SaveStatus, JournalMode, NotificationSettings, EntrySentiment } from '../types';
 import { btnIconSm } from '../lib/ui';
 import { debug } from '../lib/debug';
+import { auth } from '../lib/firebase';
 import { formatFullDate } from '../lib/datetime';
 
 const GOOGLE_MAPS_API_KEY = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) || '';
 
 interface DashboardProps {
   user: UserProfile;
+  onOpenSettings?: () => void;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ user, onOpenSettings }) => {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [activeEntry, setActiveEntry] = useState<JournalEntry | null>(null);
   const [isLoadingEntries, setIsLoadingEntries] = useState(true);
@@ -54,6 +58,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   }, []);
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings | null>(null);
   const [slackNotice, setSlackNotice] = useState<string | null>(null);
+  const [view, setView] = useState<'entry' | 'mood'>('entry');
+
+  // Content fingerprint of the last entry state we paid to score. Deliberately
+  // NOT the Slack gate's mode key: that re-fires on every mode change by design,
+  // which would re-score on each mode-pill click. Only real content moves this.
+  const scoredFingerprintByEntryRef = useRef<Map<string, string>>(new Map());
 
   // Rate limiting ref: tracks the last notified mode for each entry in this active session
   const notifiedModeByEntryRef = useRef<Map<string, string>>(new Map());
@@ -63,6 +73,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const activeEntryRef = useRef<JournalEntry | null>(null);
   // Abort controller for cancelling ongoing Gemini generation requests
   const abortControllerRef = useRef<AbortController | null>(null);
+  const isGeneratingAIRef = useRef(false);
   useEffect(() => {
     activeEntryRef.current = activeEntry;
   }, [activeEntry]);
@@ -73,6 +84,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
+    isGeneratingAIRef.current = false;
     setIsGeneratingAI(false);
   }, []);
 
@@ -111,6 +123,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           if (current) {
             const updatedMatch = fetchedEntries.find((e) => e.id === current.id);
             if (updatedMatch) {
+              // Never clobber in-memory active entry while AI is streaming or if local has newer/pending messages
+              if (isGeneratingAIRef.current || current.messages.length > updatedMatch.messages.length) {
+                return current;
+              }
               return updatedMatch;
             }
           }
@@ -150,10 +166,74 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     };
   }, [user.uid]);
 
+  /**
+   * What we consider "the content changed". Message count plus the length of the
+   * last message: enough to distinguish a new exchange from a rename, cheap to
+   * compute, and stable across re-renders of identical state.
+   */
+  const sentimentFingerprint = (entry: JournalEntry): string => {
+    // USER messages only, because that is exactly what /api/sentiment/score
+    // reads. Counting model replies too would change the fingerprint every time
+    // Gemini answered and buy a second score for identical input.
+    const mine = entry.messages.filter((m) => m.role === 'user');
+    if (mine.length === 0) return '';
+    const last = mine[mine.length - 1]?.content ?? '';
+    return `${mine.length}:${last.length}:${entry.title.length}`;
+  };
+
+  /**
+   * Score an entry, then merge the result back into BOTH the ref and state
+   * before any later save can send a stale object.
+   *
+   * saveJournalEntry merges the whole entry, so if the in-memory copy lacked
+   * `sentiment`, the next title edit would write it away. Writing to Firestore
+   * is not enough on its own — the client's copy has to learn about it too.
+   */
+  const scoreAndStore = async (entry: JournalEntry, fingerprint: string) => {
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) return;
+
+      const res = await fetch('/api/sentiment/score', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title: entry.title, messages: entry.messages }),
+      });
+      if (!res.ok) return;
+
+      const data = await res.json();
+      if (typeof data?.score !== 'number') return;
+
+      const sentiment: EntrySentiment = {
+        score: data.score,
+        label: data.label,
+        scoredAt: data.scoredAt || Date.now(),
+      };
+
+      await saveEntrySentiment(user.uid, entry.id, sentiment);
+
+      // Merge into the live copies. Guarded on id so switching entries mid-score
+      // cannot graft one entry's score onto another.
+      setEntries((prev) =>
+        prev.map((e) => (e.id === entry.id ? { ...e, sentiment } : e))
+      );
+      if (activeEntryRef.current?.id === entry.id) {
+        const merged = { ...activeEntryRef.current, sentiment };
+        activeEntryRef.current = merged;
+        setActiveEntry(merged);
+      }
+    } catch (err) {
+      // A scoring failure must never surface as a save failure.
+      debug('[Sentiment] scoring skipped', err);
+      scoredFingerprintByEntryRef.current.delete(entry.id);
+      void fingerprint;
+    }
+  };
+
   // Persist entry helper with error escalation
   const persistEntry = async (
     entryToSave: JournalEntry,
-    options?: { skipNotification?: boolean; isModeTransition?: boolean }
+    options?: { skipNotification?: boolean; isModeTransition?: boolean; scoreSentiment?: boolean }
   ) => {
     try {
       setSaveStatus('saving');
@@ -219,6 +299,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           .catch((err) => {
             console.warn('[Slack Notification] Dispatch failed:', err);
           });
+      }
+
+      // Mood tracking: opt-in, and only for saves that changed what was written.
+      // Pin, mode switch, title edit, location and summary all skip this entirely.
+      if (options?.scoreSentiment && notificationSettings?.moodTrackingEnabled) {
+        const fingerprint = sentimentFingerprint(entryToSave);
+        if (fingerprint && scoredFingerprintByEntryRef.current.get(entryToSave.id) !== fingerprint) {
+          scoredFingerprintByEntryRef.current.set(entryToSave.id, fingerprint);
+          void scoreAndStore(entryToSave, fingerprint);
+        }
       }
 
       setTimeout(() => {
@@ -325,16 +415,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
       pendingModeTransitionByEntryRef.current.delete(currentEntry.id);
     }
 
+    // Immediately engage generation lock and UI indicator
+    isGeneratingAIRef.current = true;
+    setIsGeneratingAI(true);
+    setErrorMessage(null);
+
     // Update UI and save user message immediately with modeTransition enabled if transition occurred
     activeEntryRef.current = updatedWithUserMsg;
     setActiveEntry(updatedWithUserMsg);
-    await persistEntry(updatedWithUserMsg, { isModeTransition: hadPendingTransition });
+    await persistEntry(updatedWithUserMsg, { isModeTransition: hadPendingTransition, scoreSentiment: true });
 
     // Call Gemini API with streaming
     const controller = new AbortController();
     abortControllerRef.current = controller;
-    setIsGeneratingAI(true);
-    setErrorMessage(null);
 
     const aiMsgId = `msg_${Date.now()}_m`;
     let accumulatedText = '';
@@ -374,9 +467,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
 
           setActiveEntry((prev) => {
             if (!prev || prev.id !== currentEntry.id) return prev;
-            const updatedMessages = prev.messages.map((m) =>
-              m.id === aiMsgId ? { ...m, content: accumulatedText, modelUsed: usedModel } : m
-            );
+            const hasAiMsg = prev.messages.some((m) => m.id === aiMsgId);
+            const updatedMessages = hasAiMsg
+              ? prev.messages.map((m) =>
+                  m.id === aiMsgId ? { ...m, content: accumulatedText, modelUsed: usedModel } : m
+                )
+              : [
+                  ...prev.messages,
+                  {
+                    id: aiMsgId,
+                    role: 'model' as const,
+                    content: accumulatedText,
+                    timestamp: Date.now(),
+                    modelUsed: usedModel,
+                  },
+                ];
             const nextEntry = {
               ...prev,
               messages: updatedMessages,
@@ -398,6 +503,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         );
       }
     } finally {
+      isGeneratingAIRef.current = false;
       setIsGeneratingAI(false);
       abortControllerRef.current = null;
 
@@ -413,8 +519,30 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           setActiveEntry(cleaned);
           await persistEntry(cleaned);
         } else {
-          // Persist the full or partial generated content cleanly
-          await persistEntry(current);
+          // Guarantee generated response is preserved in the saved entry
+          const hasAiMsg = current.messages.some((m) => m.id === aiMsgId);
+          const finalMessages = hasAiMsg
+            ? current.messages.map((m) =>
+                m.id === aiMsgId ? { ...m, content: accumulatedText, modelUsed: usedModel } : m
+              )
+            : [
+                ...current.messages,
+                {
+                  id: aiMsgId,
+                  role: 'model' as const,
+                  content: accumulatedText,
+                  timestamp: Date.now(),
+                  modelUsed: usedModel,
+                },
+              ];
+          const finalEntry = {
+            ...current,
+            messages: finalMessages,
+            updatedAt: Date.now(),
+          };
+          activeEntryRef.current = finalEntry;
+          setActiveEntry(finalEntry);
+          await persistEntry(finalEntry);
         }
       }
     }
@@ -551,7 +679,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
       )}
 
       {/* Main Journal Editor Workspace */}
-      <main id="main-content" className="flex flex-1 flex-col h-full overflow-hidden">
+      <main id="main-content" className={`flex flex-1 flex-col h-full ${view === 'mood' ? 'overflow-y-auto' : 'overflow-hidden'}`}>
+        {view === 'mood' ? (
+          <MoodFlow
+            entries={entries}
+            isEnabled={Boolean(notificationSettings?.moodTrackingEnabled)}
+            onOpenSettings={onOpenSettings}
+            view={view}
+            onChangeView={setView}
+          />
+        ) : (
         <JournalEditor
           entry={effectiveEntry}
           onUpdateEntry={handleUpdateEntry}
@@ -565,7 +702,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           onToggleSidebarMobile={() => setMobileSidebarOpen(true)}
           isSidebarOpen={isSidebarOpen}
           onToggleSidebar={toggleSidebar}
+          view={view}
+          onChangeView={setView}
         />
+        )}
       </main>
     </div>
     </APIProvider>

@@ -4,7 +4,6 @@ import remarkGfm from 'remark-gfm';
 import {
   Send,
   ArrowUp,
-  Square,
   Mic,
   MicOff,
   AudioLines,
@@ -56,6 +55,8 @@ interface JournalEditorProps {
   isSidebarOpen?: boolean;
   onToggleSidebar?: () => void;
   onStopGeneration?: () => void;
+  view?: 'entry' | 'mood';
+  onChangeView?: (view: 'entry' | 'mood') => void;
 }
 
 /**
@@ -107,6 +108,8 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
   isSidebarOpen = true,
   onToggleSidebar,
   onStopGeneration,
+  view = 'entry',
+  onChangeView,
 }) => {
   const [inputText, setInputText] = useState('');
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
@@ -626,6 +629,28 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
         </div>
 
         <div className="flex min-w-0 items-center gap-2">
+          {onChangeView && (
+            <div
+              role="group"
+              aria-label="View"
+              className="flex shrink-0 items-center gap-0.5 rounded-lg border border-line bg-subtle p-0.5"
+            >
+              {(['entry', 'mood'] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  aria-pressed={view === v}
+                  onClick={() => onChangeView(v)}
+                  className={`cursor-pointer whitespace-nowrap rounded-md px-2.5 py-1.5 text-meta font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink motion-reduce:transition-none ${
+                    view === v ? 'bg-surface text-ink shadow-2xs' : 'text-ink-soft hover:text-ink'
+                  }`}
+                >
+                  {v === 'entry' ? 'Entry' : 'Mood flow'}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Mode Selector */}
           <div
             role="group"
@@ -873,46 +898,17 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
                         )}
                       </div>
                     ) : isLastModelStreaming ? (
-                      <div role="status" className="flex items-center justify-between py-1 text-meta text-ink-muted">
-                        <div className="flex items-center gap-2">
-                          <span className="h-2 w-2 rounded-full bg-ink-muted animate-pulse motion-reduce:animate-none" aria-hidden="true" />
-                          <span className="h-2 w-2 rounded-full bg-ink-muted animate-pulse delay-150 motion-reduce:animate-none" aria-hidden="true" />
-                          <span className="h-2 w-2 rounded-full bg-ink-muted animate-pulse delay-300 motion-reduce:animate-none" aria-hidden="true" />
-                          <span className="ml-1 text-ui font-medium text-ink-soft">Gemini is writing…</span>
-                        </div>
-                        {onStopGeneration && (
-                          <button
-                            type="button"
-                            onClick={onStopGeneration}
-                            aria-label="Stop generation"
-                            className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 py-1 text-meta font-medium text-ink-secondary shadow-2xs transition-colors duration-150 hover:bg-muted-surface hover:text-red-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-                          >
-                            <Square className="h-2.5 w-2.5 fill-current" aria-hidden="true" />
-                            <span>Stop generation</span>
-                          </button>
-                        )}
+                      <div role="status" className="flex items-center gap-2 py-1 text-meta text-ink-muted">
+                        <span className="h-2 w-2 rounded-full bg-ink-muted animate-pulse motion-reduce:animate-none" aria-hidden="true" />
+                        <span className="h-2 w-2 rounded-full bg-ink-muted animate-pulse delay-150 motion-reduce:animate-none" aria-hidden="true" />
+                        <span className="h-2 w-2 rounded-full bg-ink-muted animate-pulse delay-300 motion-reduce:animate-none" aria-hidden="true" />
+                        <span className="ml-1 text-ui font-medium text-ink-soft">Gemini is writing…</span>
                       </div>
                     ) : null}
                   </div>
                 </div>
               );
             })
-          )}
-
-          {/* Floating Stop Generation in Chat (Matching Google AI Studio) */}
-          {isGeneratingAI && onStopGeneration && (
-            <div className="sticky bottom-2 z-20 flex justify-center py-2 pointer-events-none">
-              <button
-                id="stop-generation-chat-btn"
-                type="button"
-                onClick={onStopGeneration}
-                aria-label="Stop generation"
-                className="pointer-events-auto flex cursor-pointer items-center gap-2 rounded-full border border-line bg-surface/95 px-4 py-1.5 text-meta font-medium text-ink shadow-md backdrop-blur-xs transition-all duration-150 hover:bg-muted-surface hover:border-line-strong hover:shadow-lg active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink motion-reduce:transition-none"
-              >
-                <Square className="h-2.5 w-2.5 fill-current text-ink" aria-hidden="true" />
-                <span>Stop generation</span>
-              </button>
-            </div>
           )}
 
               <div ref={messagesEndRef} />

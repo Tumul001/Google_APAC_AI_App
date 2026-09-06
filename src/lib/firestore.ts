@@ -24,7 +24,7 @@ import {
 import { app } from './firebase';
 import { debug } from './debug';
 import firebaseConfig from '../../firebase-applet-config.json';
-import type { JournalEntry, EntryLocation, AdminAuditLog, NotificationSettings } from '../types';
+import type { JournalEntry, EntryLocation, EntrySentiment, AdminAuditLog, NotificationSettings } from '../types';
 
 // Initialize Firestore with the specific databaseId from config if present
 export const db =
@@ -77,6 +77,32 @@ export function validateLocation(loc: unknown): EntryLocation | undefined {
     placeName: placeName.slice(0, 256),
   };
 }
+/**
+ * Like sanitizePayload, but DROPS undefined keys instead of writing null.
+ *
+ * saveJournalEntry merges the whole entry object, and a null would overwrite a
+ * field the caller simply did not know about — which is how a stored sentiment
+ * score gets destroyed by an unrelated title edit. Scoped to the sentiment
+ * write so the shared serializer's behaviour is unchanged everywhere else.
+ */
+function stripUndefined<T>(obj: T): T {
+  return JSON.parse(JSON.stringify(obj));
+}
+
+/**
+ * Writes ONLY the sentiment field. Never the entry, so it cannot clobber a
+ * concurrent edit, and an absent score never becomes an explicit null.
+ */
+export async function saveEntrySentiment(
+  userId: string,
+  entryId: string,
+  sentiment: EntrySentiment
+): Promise<void> {
+  if (!userId || !entryId) throw new Error('User ID and Entry ID are required.');
+  const ref = doc(db, 'users', userId, 'interactions', entryId);
+  await setDoc(ref, stripUndefined({ sentiment }), { merge: true });
+}
+
 /**
  * Firestore CRUD helpers strictly bound to /users/{userId}/interactions/{entryId}
  */
@@ -216,6 +242,7 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
   slackEnabled: false,
   slackTriggerModes: ['gratitude', 'deep_thinking'],
   weeklyDigestEnabled: false,
+  moodTrackingEnabled: false,
 };
 
 /**
@@ -230,6 +257,7 @@ function parseNotificationSettings(raw: unknown): NotificationSettings {
       ? data.slackTriggerModes
       : DEFAULT_NOTIFICATION_SETTINGS.slackTriggerModes,
     weeklyDigestEnabled: Boolean(data.weeklyDigestEnabled),
+    moodTrackingEnabled: Boolean(data.moodTrackingEnabled),
     digestWebhookUrl: typeof data.digestWebhookUrl === 'string' ? data.digestWebhookUrl : undefined,
     updatedAt: data.updatedAt,
   };
@@ -300,6 +328,7 @@ export async function saveUserNotificationSettings(
       slackEnabled: Boolean(settings.slackEnabled),
       slackTriggerModes: settings.slackTriggerModes,
       weeklyDigestEnabled: Boolean(settings.weeklyDigestEnabled),
+      moodTrackingEnabled: Boolean(settings.moodTrackingEnabled),
       digestWebhookUrl: settings.digestWebhookUrl?.trim() || null,
       updatedAt: Date.now(),
     },

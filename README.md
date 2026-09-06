@@ -24,10 +24,11 @@ A production-grade, enterprise-ready conversational journaling and self-reflecti
 9. [Feature 4: Role-Based Access Control (RBAC) & Coach Review Flow](#9-feature-4-role-based-access-control-rbac--coach-review-flow)
 10. [Feature 5: Opt-In Slack Notifications & Webhook Security](#10-feature-5-opt-in-slack-notifications--webhook-security)
 11. [Feature 6: Weekly AI Digest via Cloud Scheduler & OIDC Token Verification](#11-feature-6-weekly-ai-digest-via-cloud-scheduler--oidc-token-verification)
-12. [Security Remediation: Environment Template & Repository Hygiene](#12-security-remediation-environment-template--repository-hygiene)
-13. [Local Development & Environment Setup](#13-local-development--environment-setup)
-14. [Functional Walkthrough & Verification Test Suites](#14-functional-walkthrough--verification-test-suites)
-15. [OWASP Top 10 & LLM Security Compliance Checklist](#15-owasp-top-10--llm-security-compliance-checklist)
+12. [Feature 7: Mood Flow — Opt-In Sentiment Streamgraph](#12-feature-7-mood-flow--opt-in-sentiment-streamgraph)
+13. [Security Remediation: Environment Template & Repository Hygiene](#13-security-remediation-environment-template--repository-hygiene)
+14. [Local Development & Environment Setup](#14-local-development--environment-setup)
+15. [Functional Walkthrough & Verification Test Suites](#15-functional-walkthrough--verification-test-suites)
+16. [OWASP Top 10 & LLM Security Compliance Checklist](#16-owasp-top-10--llm-security-compliance-checklist)
 
 ---
 
@@ -389,7 +390,76 @@ gcloud scheduler jobs create http weekly-journal-digest \
 
 ---
 
-## 12. Security Remediation: Environment Template & Repository Hygiene
+## 12. Feature 7: Mood Flow — Opt-In Sentiment Streamgraph
+
+A streamgraph of how the weeks have felt, built from a sentiment score attached to each entry.
+
+### Consent, and why this feature needs it
+
+Every other Gemini call in this application happens because the user chose to send something: they wrote a message, or pressed **Summarize**. Mood tracking is different — it scores an entry **automatically on save**, including entries the user never sent to the model.
+
+That makes it a privacy-relevant opt-in of the same tier as Slack notifications (Section 10) and the weekly digest (Section 11):
+
+- **Off by default.** Stored at `/users/{uid}.notificationSettings.moodTrackingEnabled`. With it off, no scoring request is ever issued and no sentiment is ever written.
+- **The Settings copy states exactly what leaves the device**: *"Your entry text is sent to Gemini when you save it, which does not otherwise happen unless you write to it directly."* No euphemism, and not buried in a tooltip.
+- **Consent is re-checked server-side.** `/api/sentiment/backfill` reads `moodTrackingEnabled` from Firestore before scoring anything, so a valid ID token alone is never sufficient to start sending a user's back catalogue to Gemini.
+- **Sentiment is never exposed to the Coach/Admin view** (Section 9), which remains limited to entries the writer explicitly shared.
+
+### What is sent, and what is stored
+
+| | |
+|---|---|
+| **Sent to Gemini** | The entry title plus its **user** messages, capped at 1,500 characters. Model replies are never sent. |
+| **Returned** | A single decimal in `-1.0 … 1.0`. Unparseable model output yields *no score* rather than a guess. |
+| **Stored** | `sentiment: { score, label, scoredAt }` on `/users/{uid}/interactions/{entryId}`, readable only by its owner under the Section 3 rules. |
+
+### Scoring is gated so it cannot run away with quota
+
+`persistEntry` fires on pin toggles, mode switches, title edits, location changes, summaries and retries. Scoring on all of those would mean dozens of model calls per entry.
+
+Only a genuine content save requests a score, and only when a **content fingerprint** — count of user messages, length of the last one, length of the title — differs from the last fingerprint scored. The fingerprint deliberately ignores model replies, because those are never part of the scored input; counting them would purchase a second score for identical text.
+
+### Endpoints
+
+Both authenticate a **person** via a Firebase ID token — distinct from the weekly digest's OIDC gate, which authenticates a **machine** (Cloud Scheduler). Different token type, different verifier, different failure mode.
+
+- `POST /api/sentiment/score` — scores one entry's text and returns the result; the client stores it against its own entry.
+- `POST /api/sentiment/backfill` — scores the **caller's own** unscored entries, 100 per call. The uid is taken from the verified token and is never read from the request body, so a caller cannot name another account.
+
+### The chart
+
+`d3.stack()` over three sub-streams (negative / neutral / positive counts per day) using `stackOffsetWiggle` — the Byron–Wattenberg baseline — with `curveCatmullRom.alpha(0.5)` for flowing edges. There is no Y-axis, per streamgraph convention; the X-axis carries dates only. Range toggles at 7 / 30 / 90 days, defaulting to 30. Tooltips appear on hover **and keyboard focus**, so the data is not mouse-only.
+
+**The sparse-data trap.** `stackOffsetWiggle` divides by each row's sum, so a day with no entries produces `NaN` and the entire SVG path silently disappears. Real journalling is mostly empty days. `src/lib/moodFlow.ts` therefore emits a row for **every** day in the range and gives empty days a tiny epsilon, while active days carry a small baseline so the stream reads as one continuous body rather than isolated islands. A finite-check falls back to `stackOffsetSilhouette` should a future data shape still degenerate.
+
+That logic is pure — no React, no DOM — and separately checkable:
+
+```bash
+bunx tsx src/lib/moodFlow.check.ts
+```
+
+23 assertions covering empty windows, sparse windows, a single entry, all-neutral data, unscored entries, out-of-range entries, score clamping and same-day averaging — executed against the real `d3-shape` stack rather than a stand-in.
+
+Below three scored entries the chart is replaced by *"Keep journaling to see your mood flow emerge."* rather than a broken or misleading shape.
+
+Colours resolve from `--color-mood-positive` / `--color-mood-neutral` / `--color-mood-negative`, aliases of amber, stone and slate ramps already present in the token layer — no new hues enter the palette.
+
+### Backfilling existing entries
+
+Entries written before mood tracking was enabled carry no score and are simply absent from the chart. To score them, enable the toggle and call the backfill route with the signed-in user's ID token:
+
+```bash
+# Obtain a token from the browser console while signed in:
+#   await firebase.auth().currentUser.getIdToken()
+curl -X POST https://<service-url>/api/sentiment/backfill \
+  -H "Authorization: Bearer $ID_TOKEN"
+```
+
+It returns `{ scored, skipped, failed, remaining }`. Already-scored entries are skipped, so the call is safe to repeat; `remaining: "more may remain"` means another call is needed.
+
+---
+
+## 13. Security Remediation: Environment Template & Repository Hygiene
 
 ### Problem Statement & Threat Vector
 If `.env.example` contains actual operational secrets (API keys or live webhook URLs) instead of generic placeholder text, committing the file creates an immediate credential leakage vulnerability (OWASP A02:2021).
@@ -417,7 +487,7 @@ If `.env.example` contains actual operational secrets (API keys or live webhook 
 
 ---
 
-## 13. Local Development & Environment Setup
+## 14. Local Development & Environment Setup
 
 ### Prerequisites
 - **Node.js**: v20.0.0 or higher
@@ -462,7 +532,7 @@ The application will boot at `http://localhost:3000` with unified frontend and E
 
 ---
 
-## 14. Functional Walkthrough & Verification Test Suites
+## 15. Functional Walkthrough & Verification Test Suites
 
 Every user interaction, state change, and security boundary is mapped to the following verification test matrix.
 
@@ -527,19 +597,19 @@ Every user interaction, state change, and security boundary is mapped to the fol
 
 ---
 
-## 15. OWASP Top 10 & LLM Security Compliance Checklist
+## 16. OWASP Top 10 & LLM Security Compliance Checklist
 
 - [x] **OWASP A01:2021 — Broken Access Control**: Owner-bound Firestore rules, custom claims verification, silent non-admin route redirection, OIDC token audience checks.
 - [x] **OWASP A02:2021 — Cryptographic Failures**: HTTPS in-transit encryption, Google Secret Manager for operational credentials (`GEMINI_API_KEY`, `SLACK_WEBHOOK_URL`), zero plain-text token storage, sanitized `.env.example`.
-- [x] **OWASP A03:2021 — Injection**: Schema-bound JSON request deserialization, strict coordinate numeric range checking, non-executable prompt assembly, Slack mrkdwn character escaping.
+- [x] **OWASP A03:2021 — Injection**: Defensive type-guarded request deserialization, strict coordinate numeric range checking, non-executable prompt assembly, Slack mrkdwn character escaping.
 - [x] **OWASP A04:2021 — Insecure Design**: Threat modeling applied across 10 zones, default-deny Firestore rules, user opt-in coach sharing, user opt-in external notifications.
-- [x] **OWASP A05:2021 — Security Misconfiguration**: Explicit collection group wildcard rules, zero `allow read, write: if true;`, restrictive CORS and header policies.
+- [x] **OWASP A05:2021 — Security Misconfiguration**: Explicit collection group wildcard rules, zero `allow read, write: if true;`, fail-closed digest route rejecting all callers when unconfigured.
 - [x] **OWASP A07:2021 — Identification & Authentication Failures**: Federated Google Sign-In with Firebase Auth, server-verified custom claims, automatic token refresh, OIDC service account authentication.
-- [x] **OWASP A09:2021 — Security Logging & Monitoring Failures**: Immutable `admin_audit_logs` tracking every administrative access event.
+- [x] **OWASP A09:2021 — Security Logging & Monitoring Failures**: Immutable `admin_audit_logs` recording coach entry-view events in the review UI.
 - [x] **OWASP A10:2021 — Server-Side Request Forgery (SSRF)**: Webhook destination validated strictly against `https://hooks.slack.com/services/` with arbitrary external URI inputs rejected.
-- [x] **OWASP LLM01 — Prompt Injection**: Server-segregated system instructions, non-executable user message framing, bounded temperature.
+- [x] **OWASP LLM01 — Prompt Injection**: Server-resident mode-scoped system instructions with no client override path, non-executable user message framing, bounded temperature.
 - [x] **OWASP LLM02 — Insecure Output Handling**: Markdown sanitization and safe React component rendering to prevent XSS.
-- [x] **OWASP LLM05 — Supply Chain & Resource Exhaustion**: Resilient 4-stage model fallback ladder to prevent downtime during quota exhaustion or service degradation.
+- [x] **OWASP LLM05 — Supply Chain & Resource Exhaustion**: Resilient 5-stage model fallback ladder to prevent downtime during quota exhaustion or service degradation.
 - [x] **OWASP LLM06 — Sensitive Information Disclosure**: Anonymized client IDs in coach review mode, strict tenant-bound database partitioning, ~200-char truncated Slack excerpts, personal digest webhooks separated from team channels.
 
 ---

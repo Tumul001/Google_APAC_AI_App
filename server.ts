@@ -5,6 +5,7 @@ import { GoogleGenAI } from '@google/genai';
 import { createServer as createViteServer } from 'vite';
 import { initializeApp as initAdminApp, getApps as getAdminApps, applicationDefault } from 'firebase-admin/app';
 import { getFirestore as getAdminFirestore, type Firestore } from 'firebase-admin/firestore';
+import { getAuth as getAdminAuth } from 'firebase-admin/auth';
 // Resolved through firebase-admin, which already depends on it. Not declared in
 // package.json by decision: if a future firebase-admin restructure drops it,
 // this import fails loudly at boot rather than silently weakening the check.
@@ -86,9 +87,7 @@ const VOICE = `How to write:
 - If what they wrote is vague, ask for the missing specific before interpreting anything.
 - Close with at most one question, and only if it could not have been asked before reading their words.`;
 
-function getSystemPromptForMode(mode: string = 'reflection', customInstruction?: string): string {
-  if (customInstruction) return customInstruction;
-
+function getSystemPromptForMode(mode: string = 'reflection'): string {
   let defaultSystemPrompt = `You are a reflective writing partner inside someone's private journal.
 
 Help the person look at what they wrote and see it more clearly. Notice what they said sideways, what they left out, and where two things they believe are in tension. Stay with their material rather than generalising away from it.
@@ -113,6 +112,8 @@ ${VOICE}`;
 Take what they noticed seriously and look closer at it: who else was involved, what it cost someone, what would be missing without it. Specific and concrete. Do not inflate a small thing into a life lesson, and do not congratulate them for being grateful.
 
 ${VOICE}`;
+  } else if (mode === 'sentiment') {
+    return 'You output a single decimal number between -1.0 and 1.0. Never any other text.';
   } else if (mode === 'summary') {
     defaultSystemPrompt = `You summarise a journal conversation for the person who wrote it, in their own second person.
 
@@ -126,13 +127,12 @@ ${VOICE}`;
 
 async function generateContentWithFallback(
   messages: MessagePart[],
-  systemInstruction?: string,
   mode: string = 'reflection'
 ) {
   const ai = getGenAI();
   let lastError: any = null;
 
-  const promptToUse = getSystemPromptForMode(mode, systemInstruction);
+  const promptToUse = getSystemPromptForMode(mode);
 
   // Convert messages to GenAI format
   const contents = messages.map((m) => ({
@@ -578,7 +578,7 @@ ${lines}
 
 Write them a short summary of their week. Name the themes that actually recur and any pattern worth noticing — which modes they reached for, what they returned to more than once. Warm, but do not flatter or congratulate them for journalling. Under 140 words. No headings, no bullet list.`;
 
-  const result = await generateContentWithFallback([{ role: 'user', content: prompt }], undefined, 'summary');
+  const result = await generateContentWithFallback([{ role: 'user', content: prompt }], 'summary');
   return result.text || '';
 }
 
@@ -706,12 +706,186 @@ app.post('/api/digest/weekly', async (req, res) => {
   }
 });
 
+/* ───────────────────────────────────────────────────────────────────────────
+   Sentiment scoring (Mood Flow)
+
+   Opt-in only. This is the one path that sends journal content to Gemini
+   without the user composing a message, so the client must not call it unless
+   the owner enabled mood tracking — and every write here is scoped to the uid
+   proven by a Firebase ID token, never a uid supplied in a request body.
+
+   Distinct from the digest's OIDC gate: that authenticates a *machine*
+   (Cloud Scheduler). These routes authenticate a *person* acting on their own
+   data, which is a different token type and a different verifier.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const SENTIMENT_BACKFILL_LIMIT = 100;   // entries per backfill call
+const SENTIMENT_INPUT_CHARS = 1500;     // per entry, sent to the model
+
+interface AuthedUser {
+  uid: string;
+}
+
+/** Verifies a Firebase ID token and returns the caller's uid, or null. */
+async function verifyFirebaseUser(req: express.Request): Promise<AuthedUser | null> {
+  const header = req.headers.authorization || '';
+  if (!header.startsWith('Bearer ')) return null;
+  const token = header.slice(7).trim();
+  if (!token) return null;
+
+  try {
+    getAdminDb(); // ensures the admin app is initialised
+    const decoded = await getAdminAuth().verifyIdToken(token);
+    if (!decoded?.uid) return null;
+    return { uid: decoded.uid };
+  } catch (err: any) {
+    console.warn('[Sentiment] ID token rejected:', err?.message || 'verification failed');
+    return null;
+  }
+}
+
+function labelFor(score: number): 'negative' | 'neutral' | 'positive' {
+  if (score <= -0.15) return 'negative';
+  if (score >= 0.15) return 'positive';
+  return 'neutral';
+}
+
+/** Flattens an entry into the text the model scores. Bounded. */
+function sentimentInput(title: unknown, messages: unknown): string {
+  const parts: string[] = [];
+  if (typeof title === 'string' && title.trim()) parts.push(title.trim());
+  if (Array.isArray(messages)) {
+    for (const m of messages as any[]) {
+      if (m && m.role === 'user' && typeof m.content === 'string' && m.content.trim()) {
+        parts.push(m.content.trim());
+      }
+    }
+  }
+  return parts.join('\n').slice(0, SENTIMENT_INPUT_CHARS);
+}
+
+/**
+ * One model call, one number. Returns null rather than guessing when the model
+ * gives anything unparseable — an absent score is honest, a fabricated one is not.
+ */
+async function scoreSentiment(text: string): Promise<{ score: number; label: string } | null> {
+  if (!text.trim()) return null;
+
+  const prompt = `Rate the emotional tone of this journal writing on a scale from -1.0 to 1.0, where -1.0 is deeply distressed, 0 is neutral or mixed, and 1.0 is genuinely joyful.
+
+Reply with the number and nothing else. No explanation, no label, no punctuation beyond the decimal point.
+
+---
+${text}
+---`;
+
+  const result = await generateContentWithFallback(
+    [{ role: 'user', content: prompt }],
+    'sentiment'
+  );
+
+  const match = (result.text || '').match(/-?\d*\.?\d+/);
+  if (!match) return null;
+  const raw = Number(match[0]);
+  if (!Number.isFinite(raw)) return null;
+
+  const score = Math.max(-1, Math.min(1, raw));
+  return { score, label: labelFor(score) };
+}
+
+/** Scores one entry's text. The caller stores the result against their own entry. */
+app.post('/api/sentiment/score', async (req, res) => {
+  const user = await verifyFirebaseUser(req);
+  if (!user) return res.status(401).json({ error: 'Unauthorized.' });
+
+  try {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const text = sentimentInput(body.title, body.messages);
+    if (!text) return res.status(400).json({ error: 'Nothing to score.' });
+
+    const scored = await scoreSentiment(text);
+    if (!scored) return res.status(502).json({ error: 'Could not score this entry.' });
+
+    return res.json({ success: true, ...scored, scoredAt: Date.now() });
+  } catch (error: any) {
+    console.error('[Sentiment] Scoring failed:', error?.message || error);
+    return res.status(500).json({ error: 'Scoring failed.' });
+  }
+});
+
+/**
+ * Backfills the CALLER'S OWN entries. The uid comes from the verified token and
+ * is never read from the body, so a caller cannot name someone else's account.
+ */
+app.post('/api/sentiment/backfill', async (req, res) => {
+  const user = await verifyFirebaseUser(req);
+  if (!user) return res.status(401).json({ error: 'Unauthorized.' });
+
+  try {
+    const db = getAdminDb();
+
+    // Consent is checked server-side too: a token alone must not be enough to
+    // start sending someone's back catalogue to Gemini.
+    const profile = await db.collection('users').doc(user.uid).get();
+    const settings = (profile.data()?.notificationSettings ?? {}) as Record<string, unknown>;
+    if (settings.moodTrackingEnabled !== true) {
+      return res.status(403).json({ error: 'Mood tracking is not enabled for this account.' });
+    }
+
+    const snap = await db
+      .collection('users')
+      .doc(user.uid)
+      .collection('interactions')
+      .orderBy('updatedAt', 'desc')
+      .limit(SENTIMENT_BACKFILL_LIMIT)
+      .get();
+
+    let scored = 0;
+    let skipped = 0;
+    let failed = 0;
+
+    for (const docSnap of snap.docs) {
+      const data = docSnap.data();
+      if (data.sentiment && typeof data.sentiment.score === 'number') {
+        skipped += 1;
+        continue;
+      }
+      const text = sentimentInput(data.title, data.messages);
+      if (!text) {
+        skipped += 1;
+        continue;
+      }
+      try {
+        const result = await scoreSentiment(text);
+        if (!result) {
+          failed += 1;
+          continue;
+        }
+        await docSnap.ref.set(
+          { sentiment: { score: result.score, label: result.label, scoredAt: Date.now() } },
+          { merge: true }
+        );
+        scored += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+
+    const remaining = snap.size === SENTIMENT_BACKFILL_LIMIT ? 'more may remain' : 'complete';
+    console.log(`[Sentiment] Backfill for one user: scored ${scored}, skipped ${skipped}, failed ${failed}.`);
+    return res.json({ success: true, scored, skipped, failed, remaining });
+  } catch (error: any) {
+    console.error('[Sentiment] Backfill failed:', error?.message || error);
+    return res.status(500).json({ error: 'Backfill failed.' });
+  }
+});
+
 // Gemini Reflection and Journaling Chat Endpoint
 app.post('/api/gemini/reflect', async (req, res) => {
   try {
     // 2. Defensive Payload Ingestion (Null-Safe Destructuring)
     const body = req.body && typeof req.body === 'object' ? req.body : {};
-    const { messages, systemInstruction, mode } = body;
+    const { messages, mode } = body;
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({
@@ -735,7 +909,6 @@ app.post('/api/gemini/reflect', async (req, res) => {
 
     const result = await generateContentWithFallback(
       sanitizedMessages,
-      typeof systemInstruction === 'string' ? systemInstruction : undefined,
       typeof mode === 'string' ? mode : 'reflection'
     );
 
@@ -755,13 +928,15 @@ app.post('/api/gemini/reflect', async (req, res) => {
 // Gemini Reflection Streaming Endpoint with Server-Sent Events (SSE)
 app.post('/api/gemini/reflect/stream', async (req, res) => {
   let clientDisconnected = false;
-  req.on('close', () => {
-    clientDisconnected = true;
+  res.on('close', () => {
+    if (!res.writableEnded) {
+      clientDisconnected = true;
+    }
   });
 
   try {
     const body = req.body && typeof req.body === 'object' ? req.body : {};
-    const { messages, systemInstruction, mode } = body;
+    const { messages, mode } = body;
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({
@@ -783,10 +958,7 @@ app.post('/api/gemini/reflect/stream', async (req, res) => {
     }
 
     const ai = getGenAI();
-    const promptToUse = getSystemPromptForMode(
-      typeof mode === 'string' ? mode : 'reflection',
-      typeof systemInstruction === 'string' ? systemInstruction : undefined
-    );
+    const promptToUse = getSystemPromptForMode(typeof mode === 'string' ? mode : 'reflection');
     const contents = sanitizedMessages.map((m) => ({
       role: m.role === 'model' ? 'model' : 'user',
       parts: [{ text: m.content || '' }],
@@ -796,6 +968,7 @@ app.post('/api/gemini/reflect/stream', async (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
     if (typeof (res as any).flushHeaders === 'function') {
       (res as any).flushHeaders();
     }
@@ -825,28 +998,29 @@ app.post('/api/gemini/reflect/stream', async (req, res) => {
           }
         }
 
-        if (!clientDisconnected) {
+        if (!clientDisconnected && !res.writableEnded) {
           res.write(`data: [DONE]\n\n`);
+          res.end();
         }
-        res.end();
         return;
       } catch (err: any) {
         lastError = err;
-        console.warn(`[Gemini Stream] Error on model ${modelName}:`, err?.message || err);
+        console.warn(`[Gemini Stream] Model ${modelName} failed (${err?.status || 'error'}), stepping to next fallback:`, err?.message || err);
         // If we already sent chunks to the client, we cannot transparently fall back mid-stream
         if (streamedAnyChunk) {
-          if (!clientDisconnected) {
+          if (!clientDisconnected && !res.writableEnded) {
             res.write(`data: ${JSON.stringify({ error: err?.message || 'Streaming interrupted' })}\n\n`);
             res.write(`data: [DONE]\n\n`);
+            res.end();
           }
-          res.end();
           return;
         }
       }
     }
 
-    if (!streamedAnyChunk && !clientDisconnected) {
-      res.write(`data: ${JSON.stringify({ error: lastError?.message || 'All models exhausted' })}\n\n`);
+    if (!streamedAnyChunk && !res.writableEnded) {
+      const errorMsg = lastError?.message || 'All models exhausted';
+      res.write(`data: ${JSON.stringify({ error: errorMsg })}\n\n`);
       res.write(`data: [DONE]\n\n`);
       res.end();
     }
@@ -855,7 +1029,9 @@ app.post('/api/gemini/reflect/stream', async (req, res) => {
     if (!res.headersSent) {
       return res.status(500).json({ error: error?.message || 'Failed to initialize stream' });
     }
-    res.end();
+    if (!res.writableEnded) {
+      res.end();
+    }
   }
 });
 
@@ -887,7 +1063,6 @@ Keep the whole thing under 150 words.`;
 
     const result = await generateContentWithFallback(
       [{ role: 'user', content: prompt }],
-      undefined,
       'summary'
     );
 

@@ -409,6 +409,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                 )}
 
+                {/* Mood tracking. Its own consent because it is the only
+                    feature that sends entry text to Gemini without the person
+                    choosing to send it. The copy says so plainly. */}
+                <div className="space-y-4 border-t border-line-subtle pt-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <h3 className="text-ui font-semibold text-ink">Mood tracking</h3>
+                      <p className="mt-1 max-w-[62ch] text-ui text-ink-soft">
+                        Scores the tone of each entry you save so Mood Flow can chart how a week
+                        felt. Your entry text is sent to Gemini when you save it, which does not
+                        otherwise happen unless you write to it directly.
+                      </p>
+                    </div>
+
+                    <label className="relative mt-1 inline-flex shrink-0 cursor-pointer items-center">
+                      <input
+                        id="mood-tracking-toggle"
+                        type="checkbox"
+                        checked={settings.moodTrackingEnabled}
+                        onChange={(e) =>
+                          setSettings((prev) => ({ ...prev, moodTrackingEnabled: e.target.checked }))
+                        }
+                        className="peer sr-only"
+                      />
+                      <div className="peer h-6 w-11 rounded-full bg-muted-surface after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-line-strong after:bg-surface after:transition-transform after:duration-150 after:content-[''] peer-checked:bg-inverse peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ink motion-reduce:after:transition-none"></div>
+                    </label>
+                  </div>
+                </div>
+
                 {/* Weekly digest. Shares this card because it is the same
                     channel and the same consent, but it has its own
                     destination: a digest describes a week of private

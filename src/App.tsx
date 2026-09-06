@@ -183,7 +183,7 @@ export default function App() {
             {currentPath === '/admin' && user.isAdmin ? (
               <AdminDashboard user={user} onNavigateHome={() => navigateTo('/')} />
             ) : (
-              <Dashboard user={user} />
+              <Dashboard user={user} onOpenSettings={() => setIsSettingsOpen(true)} />
             )}
           </Suspense>
         ) : (

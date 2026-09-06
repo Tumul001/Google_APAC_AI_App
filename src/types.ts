@@ -8,6 +8,19 @@ export interface ChatMessage {
   modelUsed?: string;
 }
 
+export type SentimentLabel = 'negative' | 'neutral' | 'positive';
+
+/**
+ * A sentiment score for one entry. Written only when the owner has opted into
+ * mood tracking, and readable only by them under the existing owner-scoped rule.
+ */
+export interface EntrySentiment {
+  /** -1.0 (most negative) .. 1.0 (most positive). */
+  score: number;
+  label: SentimentLabel;
+  scoredAt: number;
+}
+
 export interface EntryLocation {
   lat: number;
   lng: number;
@@ -25,6 +38,7 @@ export interface JournalEntry {
   mood?: string;
   isPinned?: boolean;
   location?: EntryLocation;
+  sentiment?: EntrySentiment;
   sharedWithCoach?: boolean;
   shareFullIdentity?: boolean;
   authorInitial?: string;
@@ -37,6 +51,11 @@ export interface NotificationSettings {
   slackTriggerModes: JournalMode[];
   /** Weekly digest, off unless the user turns it on and supplies their own webhook. */
   weeklyDigestEnabled: boolean;
+  /**
+   * Mood tracking. Off by default: this is the only path that sends journal
+   * content to Gemini without the user composing a message, so it is opt-in.
+   */
+  moodTrackingEnabled: boolean;
   /**
    * The user's own Slack incoming webhook. A digest summarises a week of private
    * journalling, so it is never sent to the shared team channel that
