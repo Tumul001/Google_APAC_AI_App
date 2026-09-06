@@ -4,10 +4,11 @@
 [![Gemini 3.6 Flash](https://img.shields.io/badge/Google_DeepMind-Gemini_3.6_Flash-8E75B2?logo=googlegemini&logoColor=white)](https://ai.google.dev/)
 [![Firebase Firestore](https://img.shields.io/badge/Database-Cloud_Firestore-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com/docs/firestore)
 [![TypeScript](https://img.shields.io/badge/Language-TypeScript_5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Tailwind CSS](https://img.shields.io/badge/Styling-Tailwind_CSS-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![Tailwind CSS](https://img.shields.io/badge/Styling-Tailwind_CSS_v4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![Web Audio & Speech](https://img.shields.io/badge/Audio-Web_Speech_%26_Audio_API-EA4335?logo=google&logoColor=white)](#7-feature-2-google-ai-studio-style-voice-dictation--real-time-waveform-dots)
 [![Security Hardened](https://img.shields.io/badge/Security-OWASP_Top_10_Mitigated-10B981?logo=shield&logoColor=white)](#2-agentic-threat-modeling--security-architecture)
 
-A production-grade, enterprise-ready conversational journaling and self-reflection web application powered by **Gemini 3.6 Flash** and **Google Cloud Firestore**. Architected with strict tenant data isolation, zero-hardcoded secret hygiene, cryptographic Firebase Auth custom claims validation, resilient server-side model fallback ladders, optional Google Maps Platform location tagging, opt-in Slack webhook notifications, and a dedicated Coach/Admin workspace.
+A production-grade, enterprise-ready conversational journaling and self-reflection web application powered by **Google Gemini 3.6 Flash** and **Google Cloud Firestore**. Architected with strict tenant data isolation, zero-hardcoded secret hygiene, cryptographic Firebase Auth custom claims validation, a resilient server-side model fallback ladder, Google AI Studio-style voice dictation with a real-time reactive 5-dot waveform visualizer, optional Google Maps Platform location tagging, opt-in Slack webhook notifications, scheduled OIDC weekly digests, and a dedicated Coach/Admin workspace.
 
 ---
 
@@ -17,13 +18,16 @@ A production-grade, enterprise-ready conversational journaling and self-reflecti
 3. [Cloud Firestore Security Rules](#3-cloud-firestore-security-rules)
 4. [Secret Management & Zero-Hardcoding Hygiene](#4-secret-management--zero-hardcoding-hygiene)
 5. [Production Cloud Run Deployment Flow](#5-production-cloud-run-deployment-flow)
-6. [Feature 1: Google Maps Integration & Geolocation Security](#6-feature-1-google-maps-integration--geolocation-security)
-7. [Feature 2: Role-Based Access Control (RBAC) & Coach Review Flow](#7-feature-2-role-based-access-control-rbac--coach-review-flow)
-8. [Feature 3: Opt-In Slack Notifications & Webhook Security](#8-feature-3-opt-in-slack-notifications--webhook-security)
-9. [Security Remediation: Environment Template & Repository Hygiene](#9-security-remediation-environment-template--repository-hygiene)
-10. [Local Development & Environment Setup](#10-local-development--environment-setup)
-11. [Functional Walkthrough & Verification Test Suites](#11-functional-walkthrough--verification-test-suites)
-12. [OWASP Top 10 & LLM Security Compliance Checklist](#12-owasp-top-10--llm-security-compliance-checklist)
+6. [Feature 1: AI Conversational Reflection & Resilient Model Fallback Ladder](#6-feature-1-ai-conversational-reflection--resilient-model-fallback-ladder)
+7. [Feature 2: Google AI Studio-Style Voice Dictation & Real-Time Waveform Dots](#7-feature-2-google-ai-studio-style-voice-dictation--real-time-waveform-dots)
+8. [Feature 3: Google Maps Integration & Geolocation Security](#8-feature-3-google-maps-integration--geolocation-security)
+9. [Feature 4: Role-Based Access Control (RBAC) & Coach Review Flow](#9-feature-4-role-based-access-control-rbac--coach-review-flow)
+10. [Feature 5: Opt-In Slack Notifications & Webhook Security](#10-feature-5-opt-in-slack-notifications--webhook-security)
+11. [Feature 6: Weekly AI Digest via Cloud Scheduler & OIDC Token Verification](#11-feature-6-weekly-ai-digest-via-cloud-scheduler--oidc-token-verification)
+12. [Security Remediation: Environment Template & Repository Hygiene](#12-security-remediation-environment-template--repository-hygiene)
+13. [Local Development & Environment Setup](#13-local-development--environment-setup)
+14. [Functional Walkthrough & Verification Test Suites](#14-functional-walkthrough--verification-test-suites)
+15. [OWASP Top 10 & LLM Security Compliance Checklist](#15-owasp-top-10--llm-security-compliance-checklist)
 
 ---
 
@@ -32,34 +36,39 @@ A production-grade, enterprise-ready conversational journaling and self-reflecti
 ```text
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │                                     CLIENT BROWSER                                     │
-│  React 18 + TypeScript + Tailwind CSS (Stone Neutral / Modern Editorial Palette)       │
+│  React 19 + TypeScript + Tailwind CSS v4 (Warm Stone Neutral / Editorial Aesthetic)    │
 │  ├── Firebase Auth (Federated Google Sign-In, ID Token with Custom Claims)             │
+│  ├── Web Speech API & Web Audio API (AnalyserNode FFT 256, 5-Dot Harmonic Waveform)    │
+│  │   └── Dual-Tier Formatting: 0ms Client Heuristic + Async Background AI Refinement   │
 │  ├── Google Maps JS & Places API (New) (Domain-Restricted Key, Interactive Canvas)     │
 │  ├── Live Diagnostics Panel (Real-time Token Claim Inspector & In-App Retry)           │
-│  └── Notification Settings Modal (Opt-in Modes, Test Ping Diagnostic)                  │
+│  └── Notification Settings Modal (Opt-in Modes, Personal Digest Webhook, Test Ping)    │
 └───────────────────────────┬──────────────────────────────────────▲─────────────────────┘
-                            │ HTTPS Requests                       │ HTTPS Responses
+                            │ HTTPS Requests                       │ HTTPS / SSE Stream
                             ▼                                      │
 ┌──────────────────────────────────────────────────────────────────┴─────────────────────┐
 │                        GOOGLE CLOUD RUN BACKEND SERVICE                                │
-│  Express 4 Application Gateway                                                         │
-│  ├── JSON Parser & Null-Safe Request Deserializer Middleware                           │
+│  Express 4 Application Gateway (Node.js + TypeScript bundled via esbuild CJS)          │
+│  ├── Top-Level JSON Parser & Null-Safe Request Deserializer Middleware                 │
 │  ├── Resilient Model Fallback Ladder Engine:                                           │
 │  │   [Primary: gemini-3.6-flash] ──► [Fallback: gemini-3.1-flash-lite]                │
-│  │   [Dynamic: gemini-flash-latest] ──► [Reasoning: gemini-3.7-flash]                 │
+│  │   [Dynamic: gemini-flash-latest] ──► [Deep Reasoning: gemini-3.7-flash]             │
+│  ├── Sub-Second Speech Formatting Route (/api/speech/transcribe)                       │
 │  ├── Server-Side Slack Webhook Notification Proxy (/api/notifications/slack)           │
 │  │   ├── SSRF Domain Whitelist Validation (https://hooks.slack.com/services/)         │
 │  │   ├── In-Memory Rate-Limiter (Max 1 per Entry Mode, Transition Aware)               │
 │  │   └── Content Sanitizer (~200 char cap, control chars stripped, mrkdwn escaped)     │
-│  └── Secret Manager Integration (Runtime Secret Accessor)                              │
+│  ├── Authenticated Weekly Digest Route (/api/digest/weekly)                            │
+│  │   └── Strict Google-Signed OIDC Token Verification (aud, accounts.google.com)       │
+│  └── Google Cloud Secret Manager Integration (Runtime IAM Secret Accessor)             │
 └──────────────┬───────────────────────────────┬──────────────────────────┬──────────────┘
                │ Dynamic Secret Resolution     │ Server-side AI Calls     │ Outgoing Webhooks
                ▼                               ▼                          ▼
 ┌────────────────────────────┐   ┌───────────────────────────┐   ┌───────────────────────┐
 │ GOOGLE CLOUD               │   │ GOOGLE DEEPMIND           │   │ SLACK INCOMING        │
 │ SECRET MANAGER             │   │ GEMINI API                │   │ WEBHOOK SERVICE       │
-│ ├── GEMINI_API_KEY         │   │ @google/genai SDK         │   │ (Encrypted Channel)   │
-│ └── SLACK_WEBHOOK_URL      │   │ (Private In-VPC Channel)  │   │                       │
+│ ├── GEMINI_API_KEY         │   │ @google/genai SDK         │   │ (Team Channel &       │
+│ └── SLACK_WEBHOOK_URL      │   │ (Private Channel)         │   │  Per-User Channels)   │
 └────────────────────────────┘   └───────────────────────────┘   └───────────────────────┘
                │ Direct Client Subscriptions
                ▼
@@ -77,18 +86,20 @@ A production-grade, enterprise-ready conversational journaling and self-reflecti
 
 ## 2. Agentic Threat Modeling & Security Architecture
 
-The application enforces a defense-in-depth model across the **5 Core Threat Zones** and **3 Domain Directives**, mitigating vulnerabilities identified in the OWASP Top 10 (Web) and OWASP Top 10 for LLM Applications.
+The application enforces a defense-in-depth model across the **5 Core Threat Zones** and **Production Directives**, mitigating vulnerabilities identified in the OWASP Top 10 (Web) and OWASP Top 10 for LLM Applications.
 
 | # | Threat Zone | Threat Vector & Attack Scenario | Active Countermeasures & Architectural Controls | Status |
 | :--- | :--- | :--- | :--- | :---: |
-| **1** | **Input Surfaces** | Prompt injection, malformed request bodies, payload tampering, NoSQL injection | Top-level express body-parser deserialization; schema-bound sanitization; strict coordinate range validation; 400 Bad Request rejection on invalid payloads. | **Enforced** |
-| **2** | **Planning & Reasoning** | System instruction bypass, persona hijacking, jailbreaks | Segregated immutable server-side system instructions; bounded temperature parameters; treating user inputs as non-executable data strings. | **Enforced** |
-| **3** | **Tool Execution** | API credential exfiltration, SSRF, dynamic code execution | Zero-hardcoding architecture; API keys never present in client bundles; runtime Secret Manager resolution; automated 4-stage model fallback ladder. | **Enforced** |
-| **4** | **Memory & State** | Cross-user data leaks, unauthorized reads/writes, privilege escalation | Owner-bound Firestore security rules (`request.auth.uid == userId`); collection group scoping; undefined-stripping payload sanitizer on all database writes. | **Enforced** |
+| **1** | **Input Surfaces** | Prompt injection, malformed request bodies, coordinate tampering, NoSQL injection | Top-level express body-parser deserialization; schema-bound sanitization; strict coordinate range validation; 400 Bad Request rejection on invalid payloads; speech input boundary normalization. | **Enforced** |
+| **2** | **Planning & Reasoning** | System instruction bypass, persona hijacking, jailbreaks | Segregated immutable server-side system instructions; bounded temperature parameters; treating user inputs as non-executable data strings; multi-sentence split validation. | **Enforced** |
+| **3** | **Tool Execution** | API credential exfiltration, SSRF, dynamic code execution, API exhaustion | Zero-hardcoding architecture; API keys never present in client bundles; runtime Secret Manager resolution; automated 4-stage model fallback ladder; unauthenticated scheduler blocking. | **Enforced** |
+| **4** | **Memory & State** | Cross-user data leaks, unauthorized reads/writes, privilege escalation | Owner-bound Firestore security rules (`request.auth.uid == userId`); collection group scoping; undefined-stripping payload sanitizer on all database writes; no client-writable role fields. | **Enforced** |
 | **5** | **Inter-System Comm.** | Credential interception, man-in-the-middle, replay attacks, token leakage | Federated Google Sign-In via Firebase Auth; token verification over HTTPS; zero plain-text password handling or storage anywhere in custom code. | **Enforced** |
-| **6** | **Google Maps (Directive 8)** | Maps key quota theft, unauthorized tracking, coordinates spoofing, SSRF | HTTP referrer restriction; API scope lockdown (Maps JS + Places API New only); explicit browser GPS permission prompt; client/server key separation; strict lat/lng numeric range bounds (-90..90, -180..180). | **Enforced** |
-| **7** | **Admin RBAC (Directive 9)** | Forged client role claims, horizontal data leakage, unauthorized snooping | Custom claims issued exclusively by Firebase Admin SDK (`admin: true`); dual-condition rule check (`request.auth.token.admin == true && resource.data.sharedWithCoach == true`); user opt-in toggle (default OFF); append-only `admin_audit_logs`. | **Enforced** |
-| **8** | **Slack Webhook (Directive 10)** | Webhook secret leakage, SSRF via arbitrary URLs, payload injection, private text leakage | Webhook URL strictly held in Secret Manager (`SLACK_WEBHOOK_URL`); backend-only execution; domain lockdown (`https://hooks.slack.com/services/`); user opt-in trigger modes; ~200-char max sanitized excerpt (mrkdwn-escaped, control chars stripped); rate-limited to 1 alert per entry save. | **Enforced** |
+| **6** | **Speech & Waveform (Voice)** | Trailing recognition callbacks overwriting formatted text, audio context blocking, CPU spikes | Listener detachment on stop (`onresult = null`, `onend = null`); non-overwriting guarantee on API errors; CSS ambient fallback when AudioContext is blocked; animation frame cancellation. | **Enforced** |
+| **7** | **Google Maps (Directive 8)** | Maps key quota theft, unauthorized tracking, coordinates spoofing, SSRF | HTTP referrer restriction; API scope lockdown (Maps JS + Places API New only); explicit browser GPS permission prompt; client/server key separation; strict lat/lng numeric bounds (-90..90, -180..180). | **Enforced** |
+| **8** | **Admin RBAC (Directive 9)** | Forged client role claims, horizontal data leakage, unauthorized snooping | Custom claims issued exclusively by Firebase Admin SDK (`admin: true`); dual-condition rule check (`request.auth.token.admin == true && resource.data.sharedWithCoach == true`); user opt-in toggle (default OFF); append-only `admin_audit_logs`. | **Enforced** |
+| **9** | **Slack Webhook (Directive 10)** | Webhook secret leakage, SSRF via arbitrary URLs, payload injection, private text leakage | Webhook URL strictly held in Secret Manager (`SLACK_WEBHOOK_URL`); backend-only execution; domain lockdown (`https://hooks.slack.com/services/`); user opt-in trigger modes; ~200-char max sanitized excerpt (mrkdwn-escaped, control chars stripped); rate-limited to 1 alert per entry save. | **Enforced** |
+| **10** | **Weekly Digest (Directive 11)** | Unauthorized invocation, cross-user reflection leakage, double-sends | Strict Google-signed OIDC token validation (`aud`, `accounts.google.com`, `DIGEST_INVOKER_SA`); per-user scoped iteration; deliveries sent only to individual user-provided webhooks; `lastDigestSentAt` idempotency lock. | **Enforced** |
 
 ---
 
@@ -197,14 +208,14 @@ Deploy the containerized full-stack application directly to **Google Cloud Run**
 
 ### 1. Enable Required Cloud APIs
 ```bash
-gcloud services enable run.googleapis.com firestore.googleapis.com cloudbuild.googleapis.com
+gcloud services enable run.googleapis.com firestore.googleapis.com cloudbuild.googleapis.com secretmanager.googleapis.com
 ```
 
 ### 2. Build & Deploy Service with Secret Mount
 ```bash
 gcloud run deploy gemini-reflections \
   --source . \
-  --region us-central1 \
+  --region asia-southeast1 \
   --platform managed \
   --allow-unauthenticated \
   --set-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest,SLACK_WEBHOOK_URL=SLACK_WEBHOOK_URL:latest" \
@@ -215,12 +226,53 @@ gcloud run deploy gemini-reflections \
 ```bash
 gcloud run services update gemini-reflections \
   --update-labels=dev-tutorial=cloud-run-ai-challenge \
-  --region=us-central1
+  --region=asia-southeast1
 ```
 
 ---
 
-## 6. Feature 1: Google Maps Integration & Geolocation Security
+## 6. Feature 1: AI Conversational Reflection & Resilient Model Fallback Ladder
+
+The core reflection engine leverages Google DeepMind's Gemini models through the official `@google/genai` TypeScript SDK:
+
+- **Conversational Modes**:
+  - **Reflection**: Empathetic, guided inquiry helping users process thoughts and emotional states.
+  - **Brainstorm**: Expansive lateral thinking, ideation scaffolding, and actionable angle exploration.
+  - **Deep Thinking**: Rigorous analytical breakdown, cognitive reframing, and first-principles reasoning.
+  - **Gratitude**: Warm, grounded appreciation fostering mindful awareness and positivity.
+- **Dual Invocation Channels**:
+  - **Server-Sent Events (SSE) Streaming (`POST /api/gemini/reflect/stream`)**: Sub-100ms first-token latency with real-time text streaming.
+  - **Standard JSON REST (`POST /api/gemini/reflect`)**: Complete payload generation for non-streaming workflows.
+- **Executive Summarization (`POST /api/gemini/summarize`)**: Synthesizes multi-turn reflection journals into structured insights: Core Themes, Mindset Shifts, Concrete Action Items, and Growth Inquiries.
+- **4-Stage Resilient Model Fallback Ladder**:
+  Never fails on individual quota exhaustion (`429`), temporary unavailability (`503`), or server errors (`500`):
+  $$\text{Primary: } \texttt{gemini-3.6-flash} \;\longrightarrow\; \text{Fallback: } \texttt{gemini-3.1-flash-lite} \;\longrightarrow\; \text{Dynamic: } \texttt{gemini-flash-latest} \;\longrightarrow\; \text{Reasoning: } \texttt{gemini-3.7-flash}$$
+
+---
+
+## 7. Feature 2: Google AI Studio-Style Voice Dictation & Real-Time Waveform Dots
+
+In accordance with user experience fidelity matching Google AI Studio, the application features an advanced voice input system combining the **Web Speech API** with the **Web Audio API**:
+
+- **Real-Time Reactive 5-Dot Waveform Visualizer**:
+  - **Signature Aesthetic**: Transitions the microphone icon into **5 circular red waveform dots** (`•••••`, `#ea4335`), housed within an active pill container with subtle red tinting (`bg-red-500/10 border-red-500/25`).
+  - **Harmonic Vocal Tuning**: A 256-bin FFT `AnalyserNode` maps input volume to human speech harmonic bands:
+    - Bin 1: $\sim 180\text{ Hz}$ (fundamental vocal pitch)
+    - Bin 2: $\sim 375\text{ Hz}$ (vowel body)
+    - Bin 3: $\sim 560\text{ Hz}$ (core vocal energy)
+    - Bin 6: $\sim 1120\text{ Hz}$ (articulation & consonants)
+    - Bin 11: $\sim 2060\text{ Hz}$ (upper harmonic sibilance)
+  - **Symmetrical Equalizer Curve**: Peak dynamic heights are geometrically balanced ($9\text{px}, 14\text{px}, 18\text{px}, 14\text{px}, 9\text{px}$).
+  - **Ambient Breathing Pulse**: A gentle sine-wave ambient breathing oscillation ($0.5 \text{ to } 1.5\text{px}$) keeps the dots alive during natural pauses between words.
+  - **Undulating Traveling Wave on Processing**: When dictation completes and speech formatting commences, the dots seamlessly transition into an undulating left-to-right traveling ripple with staggered phase delays (`0.0s`, `0.12s`, `0.24s`, `0.36s`, `0.48s`). No circling spinner icon is shown.
+- **Dual-Tier Speech Formatting Architecture**:
+  - **Tier 1 (Instant 0ms Client Heuristic — `smartFormatVoiceText`)**: Instantly formats capitalization, multi-sentence boundaries via lookbehind regex (`[.?!]\s+`), discourse markers (`"Actually"`, `"Honestly"`, `"Meanwhile"`), greeting commas (`"Hey, "`, `"Hello, "`), capitalized `"I"` and contractions (`"I'm"`, `"I've"`, `"I'll"`), and intelligent question mark inference for interrogative clauses.
+  - **Tier 2 (Server-Side Low-Latency Refinement — `POST /api/speech/transcribe`)**: Asynchronously invokes Gemini with sub-second response times (`< 1.0s`) to polish grammatical nuances.
+  - **Zero-Overwrite Guarantee**: Trailing browser SpeechRecognition events or background network dropouts are strictly prevented from overwriting the formatted text with raw lowercase speech.
+
+---
+
+## 8. Feature 3: Google Maps Integration & Geolocation Security
 
 In accordance with **Production Directive 8**, the application integrates the **Google Maps JavaScript API** and **Places API (New)** for location-tagged journal reflections:
 
@@ -241,7 +293,7 @@ In accordance with **Production Directive 8**, the application integrates the **
 
 ---
 
-## 7. Feature 2: Role-Based Access Control (RBAC) & Coach Review Flow
+## 9. Feature 4: Role-Based Access Control (RBAC) & Coach Review Flow
 
 In accordance with **Production Directive 9**, the application implements least-privilege role-based access for an elevated "Coach / Admin" review workspace without violating base user data isolation:
 
@@ -250,10 +302,10 @@ In accordance with **Production Directive 9**, the application implements least-
 - **Client Confidentiality**: In the Coach Workspace, author identities are anonymized (e.g. `Client #A49`) to preserve client confidentiality.
 - **Immutable Admin Audit Logging**: Every coach view event triggers an append-only entry in `/admin_audit_logs` storing:
   - `adminUid`: Firebase Auth UID of the viewing coach
-  - `entryAuthorUid`: Firebase Auth UID of the reflection author
+  - `viewedUserId`: Firebase Auth UID of the reflection author
   - `entryId`: ID of the reviewed interaction
   - `entryTitle`: Title of the reflection
-  - `viewedAt`: Server timestamp
+  - `timestamp`: Server timestamp
 - **Token Synchronization & Diagnostics**: Firebase Auth client SDKs cache ID tokens for up to 1 hour. The `/admin` view implements:
   - Forced ID token refresh on mount (`user.getIdTokenResult(true)`)
   - A real-time token claim inspector displaying whether `admin: true` is cryptographically present
@@ -274,7 +326,7 @@ node scripts/set-admin-claim.js <FIREBASE_AUTH_UID>
 
 ---
 
-## 8. Feature 3: Opt-In Slack Notifications & Webhook Security
+## 10. Feature 5: Opt-In Slack Notifications & Webhook Security
 
 In accordance with **Production Directive 10**, the application supports opt-in notifications dispatched to a team's **Slack Incoming Webhook** when specific journal reflection types are saved:
 
@@ -288,80 +340,63 @@ In accordance with **Production Directive 10**, the application supports opt-in 
 
 ---
 
-## 8b. Feature 4: Weekly AI Digest (Cloud Scheduler → OIDC → Gemini → Slack)
+## 11. Feature 6: Weekly AI Digest via Cloud Scheduler & OIDC Token Verification
 
-Every Sunday evening, opted-in users receive one Gemini-written summary of the week they journalled.
+In accordance with **Production Directive 11**, users can opt into a periodic AI-synthesized reflection digest delivered securely via Slack:
 
-- **Off by default, and it needs a destination.** The toggle lives in Settings beside the existing Slack controls. Enabling it requires the user to paste **their own** Slack incoming webhook; the save button stays disabled until they do.
-- **Never the shared channel.** `SLACK_WEBHOOK_URL` is one team webhook. A digest describes a week of private journalling, so it is delivered **only** to the per-user webhook stored at `/users/{uid}.notificationSettings.digestWebhookUrl`. The shared secret is never used as a fallback for a digest — that would publish one person's reflections to everyone.
-- **Not a public endpoint.** `POST /api/digest/weekly` accepts only a Google-signed OIDC token whose `aud` matches `DIGEST_AUDIENCE`, whose issuer is `accounts.google.com`, whose `email_verified` is true, and whose `email` appears in the `DIGEST_INVOKER_SA` allowlist. Anything else gets a bare `401` with no diagnostic detail. If either variable is unset the route **refuses every caller** rather than falling open.
-- **Why in-process verification.** Cloud Run serves the web app and therefore runs `--allow-unauthenticated`, so IAM does not gate this path. The handler reads with the Firebase Admin SDK, which bypasses `firestore.rules` entirely, making this token check the only barrier in front of every user's journal.
-- **Per-user scoping.** One user is read at a time — never a cross-user query or join. Bounded at 200 users per run, 40 entries per user, a 220-character excerpt of each entry's opening message, and a 1,200-character sanitised summary. Full multi-turn threads are never read or sent.
-- **Reuses the hardened path.** Gemini output goes through the same `sanitizeSlackContent` used by per-entry notifications, and the webhook is checked against the `https://hooks.slack.com/services/` origin.
-- **Retry-safe.** `lastDigestSentAt` is written per user; a re-run within six days skips them, so a Cloud Scheduler retry cannot double-send.
-- **Responses carry counts only** — `{processed, sent, skipped, failed}`. No journal content is ever returned or logged.
+- **Opt-In with Dedicated Webhook**: Delivered strictly to the per-user webhook configured at `/users/{uid}.notificationSettings.digestWebhookUrl`. The team `SLACK_WEBHOOK_URL` is never used, protecting personal reflections from shared team channel leaks.
+- **Google-Signed OIDC Verification (`POST /api/digest/weekly`)**: Rejects unauthenticated traffic by verifying the caller's OIDC token against `accounts.google.com`, ensuring `email_verified: true`, matching `aud` against `DIGEST_AUDIENCE`, and matching the caller's email against the authorized `DIGEST_INVOKER_SA`.
+- **Tenant-Scoped Aggregation**: Gathers only past-7-day entries for opted-in users; multi-turn raw transcripts are never bundled. An executive summary is drafted via Gemini, sanitized, and dispatched.
+- **Idempotency**: Logs `lastDigestSentAt` per user to prevent duplicate dispatches during Scheduler retries.
 
-### Required environment variables
+### Setting up the Cloud Scheduler Job
 
 ```bash
-DIGEST_AUDIENCE="https://<service>-<hash>-<region>.a.run.app/api/digest/weekly"
-DIGEST_INVOKER_SA="journal-digest-scheduler@$PROJECT_ID.iam.gserviceaccount.com"
-```
-
-### Setting up the Cloud Scheduler job
-
-```bash
-# ── 0. Variables ───────────────────────────────────────────────────────────
-export PROJECT_ID="apac-track2-507117"
-export REGION="asia-south1"                     # run the job near your users
+# 1. Configuration
+export PROJECT_ID=$(gcloud config get-value project)
+export REGION="asia-southeast1"
 export SERVICE="gemini-reflections"
 export SA_NAME="journal-digest-scheduler"
 export SA_EMAIL="$SA_NAME@$PROJECT_ID.iam.gserviceaccount.com"
 
-gcloud config set project "$PROJECT_ID"
-gcloud services enable cloudscheduler.googleapis.com run.googleapis.com
+# 2. Create Service Account
+gcloud iam service-accounts create "$SA_NAME" \
+  --display-name="Weekly journal digest scheduler"
 
-# ── 1. A dedicated identity for the job ────────────────────────────────────
-# Its own service account, so the allowlist names exactly one caller and the
-# default compute identity is not reused for a privileged endpoint.
-gcloud iam service-accounts create "$SA_NAME"   --display-name="Weekly journal digest scheduler"
-
-# ── 2. Resolve the deployed URL and tell the service what to trust ─────────
-export SERVICE_URL="$(gcloud run services describe "$SERVICE"   --region "$REGION" --format='value(status.url)')"
+# 3. Resolve Service URL & Update Env Vars
+export SERVICE_URL="$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')"
 export DIGEST_URL="$SERVICE_URL/api/digest/weekly"
 
-gcloud run services update "$SERVICE"   --region "$REGION"   --update-env-vars "DIGEST_AUDIENCE=$DIGEST_URL,DIGEST_INVOKER_SA=$SA_EMAIL"
+gcloud run services update "$SERVICE" \
+  --region "$REGION" \
+  --update-env-vars "DIGEST_AUDIENCE=$DIGEST_URL,DIGEST_INVOKER_SA=$SA_EMAIL"
 
-# ── 3. Let the job invoke the service ──────────────────────────────────────
-# Harmless if the service is already public; required the moment it is not.
-gcloud run services add-iam-policy-binding "$SERVICE"   --region "$REGION"   --member="serviceAccount:$SA_EMAIL"   --role="roles/run.invoker"
-
-# ── 4. The job: every Sunday at 18:00 IST ──────────────────────────────────
-# --oidc-token-audience must equal DIGEST_AUDIENCE exactly, or the route 401s.
-gcloud scheduler jobs create http weekly-journal-digest   --location="$REGION"   --schedule="0 18 * * SUN"   --time-zone="Asia/Kolkata"   --uri="$DIGEST_URL"   --http-method=POST   --headers="Content-Type=application/json"   --message-body='{}'   --oidc-service-account-email="$SA_EMAIL"   --oidc-token-audience="$DIGEST_URL"   --attempt-deadline=540s   --max-retry-attempts=3   --min-backoff=60s
-
-# ── 5. Grant the runtime service account Firestore read/write ──────────────
-# The digest reads across users with the Admin SDK and writes lastDigestSentAt.
-export RUNTIME_SA="$(gcloud run services describe "$SERVICE"   --region "$REGION" --format='value(spec.template.spec.serviceAccountName)')"
-gcloud projects add-iam-policy-binding "$PROJECT_ID"   --member="serviceAccount:${RUNTIME_SA:-$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')-compute@developer.gserviceaccount.com}"   --role="roles/datastore.user"
-
-# ── 6. Fire it once now to confirm the whole chain ─────────────────────────
-gcloud scheduler jobs run weekly-journal-digest --location="$REGION"
-gcloud beta run services logs read "$SERVICE" --region "$REGION" --limit=20 | grep Digest
+# 4. Schedule Job (Every Sunday at 18:00 UTC)
+gcloud scheduler jobs create http weekly-journal-digest \
+  --location="$REGION" \
+  --schedule="0 18 * * SUN" \
+  --time-zone="UTC" \
+  --uri="$DIGEST_URL" \
+  --http-method=POST \
+  --headers="Content-Type=application/json" \
+  --message-body='{}' \
+  --oidc-service-account-email="$SA_EMAIL" \
+  --oidc-token-audience="$DIGEST_URL" \
+  --attempt-deadline=540s \
+  --max-retry-attempts=3 \
+  --min-backoff=60s
 ```
-
-Expect `[Digest] Run started by journal-digest-scheduler@… : N opted-in user(s).` A `401` means `--oidc-token-audience` and `DIGEST_AUDIENCE` disagree, or the caller is missing from `DIGEST_INVOKER_SA`.
 
 ---
 
-## 9. Security Remediation: Environment Template & Repository Hygiene
+## 12. Security Remediation: Environment Template & Repository Hygiene
 
 ### Problem Statement & Threat Vector
-If `.env.example` contains actual operational secrets (API keys or live webhook URLs) instead of generic placeholder text, committing the file to a public or shared GitHub repository creates an immediate credential leakage vulnerability (OWASP A02:2021).
+If `.env.example` contains actual operational secrets (API keys or live webhook URLs) instead of generic placeholder text, committing the file creates an immediate credential leakage vulnerability (OWASP A02:2021).
 
 ### Architectural Remediation Applied
 1. **Strict Placeholder Templates in `.env.example`**:
-   All values in `.env.example` have been replaced with generic placeholder strings. No real API keys, project identifiers, or webhook endpoints exist in the file:
+   All values in `.env.example` are sanitized with generic placeholder strings:
    ```env
    GEMINI_API_KEY="your_gemini_api_key_here"
    APP_URL="https://your-app-url.run.app"
@@ -369,13 +404,10 @@ If `.env.example` contains actual operational secrets (API keys or live webhook 
    SLACK_WEBHOOK_URL="https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
    ```
 2. **Repository Exclusion (`.gitignore`)**:
-   The repository's `.gitignore` explicitly excludes all `.env*` variants while preserving the sanitized `.env.example` template:
+   The repository's `.gitignore` explicitly excludes all `.env*` variants while whitelisting the sanitized `.env.example`:
    ```gitignore
    node_modules/
-   build/
    dist/
-   coverage/
-   .DS_Store
    *.log
    .env*
    !.env.example
@@ -385,11 +417,11 @@ If `.env.example` contains actual operational secrets (API keys or live webhook 
 
 ---
 
-## 10. Local Development & Environment Setup
+## 13. Local Development & Environment Setup
 
 ### Prerequisites
-- **Node.js**: v18.0.0 or higher
-- **npm** or **bun**
+- **Node.js**: v20.0.0 or higher
+- **npm**: v10.0.0 or higher
 - **Google Cloud SDK (`gcloud`)**
 - **Firebase CLI (`firebase-tools`)**
 
@@ -426,11 +458,11 @@ SLACK_WEBHOOK_URL="https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
 ```bash
 npm run dev
 ```
-The application will boot at `http://localhost:3000`.
+The application will boot at `http://localhost:3000` with unified frontend and Express backend.
 
 ---
 
-## 11. Functional Walkthrough & Verification Test Suites
+## 14. Functional Walkthrough & Verification Test Suites
 
 Every user interaction, state change, and security boundary is mapped to the following verification test matrix.
 
@@ -439,64 +471,76 @@ Every user interaction, state change, and security boundary is mapped to the fol
 - **Test 1.2 — Google Federated Sign-In**: Click "Sign in with Google". Completes OAuth consent, initializes user profile in `/users/{userId}`, and loads the workspace.
 - **Test 1.3 — Secure Session Termination**: Click "Sign Out". Active user context and Firestore snapshot listeners unmount cleanly; returns to landing view.
 
-### Test Suite 2: AI Conversational Journaling & Model Fallback
+### Test Suite 2: AI Conversational Reflection & Model Fallback
 - **Test 2.1 — Conversational Reflection**: Submit a reflection prompt. Renders immediately, persists to Firestore, and triggers Gemini 3.6 Flash. AI response renders in structured markdown with empathetic tone.
 - **Test 2.2 — Context Retention in Multi-Turn Threads**: Ask contextual follow-up. Gemini responds incorporating full dialogue history.
 - **Test 2.3 — Persona & Mode Adaptation**: Switch modes (*Gratitude*, *Brainstorm*, *Deep Thinking*). Mode indicator updates, suggestion chips refresh, and Gemini adapts its conversational style.
 - **Test 2.4 — Automated Fallback Ladder Execution**: Simulate upstream 503/429 on primary model. Server catch-block gracefully degrades (`gemini-3.6-flash` &rarr; `gemini-3.1-flash-lite` &rarr; `gemini-flash-latest` &rarr; `gemini-3.7-flash`) without failing the user's request.
 
-### Test Suite 3: Tenant Data Isolation & History Management
-- **Test 3.1 — Real-time Persistence & Refresh**: Add an entry, reload tab. Title, timestamp, messages, and metadata reload completely from Firestore.
-- **Test 3.2 — Cross-Tenant Data Isolation**: Create entry as User A. Sign in as User B. User B sees only their reflections. Direct reads against User A's subcollection path are rejected by Firestore rules.
-- **Test 3.3 — Entry Pinning & Safe Deletion**: Pin an entry to the top; delete an entry via confirmation modal. Pinned entry remains at top; deleted entry is permanently removed from Firestore.
+### Test Suite 3: Speech Dictation & Real-Time Waveform Dots
+- **Test 3.1 — Microphone Activation & 5 Red Dots**: Click microphone button in reflection editor. Icon transitions immediately to 5 circular red dots (`•••••`) in an active pill frame with gentle ambient breathing motion.
+- **Test 3.2 — Voice Harmonics Reactivity**: Speak into microphone. Dots expand symmetrically into dynamic equalizer bars reacting in real time to voice volume and frequency bands (outer: 9px, mid: 14px, center: 18px).
+- **Test 3.3 — Undulating Processing Wave**: Click to stop recording. Dots immediately execute an undulating left-to-right traveling wave without any circling spinner icon appearing.
+- **Test 3.4 — 0ms Instant Heuristic Formatting**: Speak: *"hey I am audible hey am I audible"*. Click stop. Text instantly displays formatted as:
+  ```text
+  Hey, I am audible. Hey, am I audible?
+  ```
+  with proper capitalization, greeting commas, and question mark inference.
+- **Test 3.5 — Non-Overwriting Protection**: In poor network conditions where background Gemini refinement times out, the client preserves the formatted heuristic text and never overwrites it with unformatted raw speech.
 
-### Test Suite 4: Executive Insights & Summarization
-- **Test 4.1 — Conversation Synthesis**: Click "Summarize" on any multi-turn reflection. Generates structured breakdown with Core Themes, Mindset Insights, Action Items, and Growth Inquiries.
+### Test Suite 4: Tenant Data Isolation & History Management
+- **Test 4.1 — Real-time Persistence & Refresh**: Add an entry, reload tab. Title, timestamp, messages, and metadata reload completely from Firestore.
+- **Test 4.2 — Cross-Tenant Data Isolation**: Create entry as User A. Sign in as User B. User B sees only their reflections. Direct reads against User A's subcollection path are rejected by Firestore rules.
+- **Test 4.3 — Entry Pinning & Safe Deletion**: Pin an entry to the top; delete an entry via confirmation modal. Pinned entry remains at top; deleted entry is permanently removed from Firestore.
 
-### Test Suite 5: Geolocation Tagging & Maps Integration (Directive 8)
-- **Test 5.1 — Google Places Autocomplete**: Click "Add Location", search *"Kyoto, Japan"*, select from dropdown. Place resolved, interactive map preview rendered, and location pill attached.
-- **Test 5.2 — Explicit Browser GPS Capture**: Click "Use Current Location". Browser displays native permission prompt. Upon consent, coordinates are captured and validated against numeric bounds (-90..90, -180..180).
-- **Test 5.3 — Optional Location Invariance**: Save an entry without location. Saves cleanly with location object omitted.
-- **Test 5.4 — Location Detachment**: Click "Remove" on an attached location preview. Map unmounts and location object is removed from Firestore document.
+### Test Suite 5: Executive Insights & Summarization
+- **Test 5.1 — Conversation Synthesis**: Click "Summarize" on any multi-turn reflection. Generates structured breakdown with Core Themes, Mindset Insights, Action Items, and Growth Inquiries.
 
-### Test Suite 6: Role-Based Access Control & Coach Audit Trail (Directive 9)
-- **Test 6.1 — Default Privacy (Opt-in Off)**: Newly created entry has "Share with Coach" toggle set to OFF (`sharedWithCoach: false`).
-- **Test 6.2 — Explicit Sharing Consent**: Toggle "Share with Coach" to active. Document updates in Firestore with `sharedWithCoach: true`; status badge appears in entry list.
-- **Test 6.3 — Silent Redirection for Non-Admins**: Attempt navigating to `/admin` as standard user without `admin: true` claim. Redirects quietly to `/` without leaking route existence.
-- **Test 6.4 — Coach Workspace Anonymized Dashboard**: Navigate to `/admin` as user with `admin: true`. Displays only reflections marked `sharedWithCoach: true`. Author identities are anonymized (e.g. `Client #8F2`).
-- **Test 6.5 — Immutable Admin Audit Logging**: Click on shared client reflection in Coach Workspace. Append-only log written to `/admin_audit_logs`. Direct updates or deletes to the log fail under Firestore rules.
-- **Test 6.6 — Token Claim Inspector & In-App Retry**: If token is stale, diagnostic panel displays claims status and provides "Refresh Token & Retry" button for immediate resolution.
+### Test Suite 6: Geolocation Tagging & Maps Integration (Directive 8)
+- **Test 6.1 — Google Places Autocomplete**: Click "Add Location", search *"Kyoto, Japan"*, select from dropdown. Place resolved, interactive map preview rendered, and location pill attached.
+- **Test 6.2 — Explicit Browser GPS Capture**: Click "Use Current Location". Browser displays native permission prompt. Upon consent, coordinates are captured and validated against numeric bounds (-90..90, -180..180).
+- **Test 6.3 — Optional Location Invariance**: Save an entry without location. Saves cleanly with location object omitted.
+- **Test 6.4 — Location Detachment**: Click "Remove" on an attached location preview. Map unmounts and location object is removed from Firestore document.
 
-### Test Suite 7: Opt-In Slack Notifications & Content Sanitization (Directive 10)
-- **Test 7.1 — Default Inactivity**: Save entry with default settings. No HTTP calls to `/api/notifications/slack`.
-- **Test 7.2 — Opt-In & Trigger Mode Configuration**: Open Settings modal, toggle "Enable Slack Notifications" to ON, select "Gratitude". Preferences persist to `/users/{userId}` in Firestore.
-- **Test 7.3 — Mode-Filtered Server Dispatch**: Save reflection in **Gratitude** mode. After Firestore write confirmation, backend sanitizes excerpt and posts to Slack webhook. UI displays confirmation banner.
-- **Test 7.4 — Unselected Mode Suppression**: Save reflection in **Brainstorm** mode. Firestore saves, but Slack notification is suppressed.
-- **Test 7.5 — Content Sanitization & Truncation**: Submit entry with formatting marks and >400 characters. Slack preview escapes markdown characters, strips control characters, and truncates strictly at ~200 characters.
-- **Test 7.6 — Duplicate Suppression (Rate-Limiting)**: Edit same Gratitude entry multiple times. In-memory rate-limiter and session tracker skip redundant webhook calls (`skipped: true`).
-- **Test 7.7 — Mode Transition Lock Clearing**: Switch entry from Gratitude to Brainstorm and back to Gratitude. Intentional mode transition flag resets lock so the new Gratitude message dispatches properly.
-- **Test 7.8 — Test Ping Diagnostic**: Click "Send Test Ping" in Settings. Backend sends verified diagnostic ping to Slack channel confirming end-to-end integration.
+### Test Suite 7: Role-Based Access Control & Coach Audit Trail (Directive 9)
+- **Test 7.1 — Default Privacy (Opt-in Off)**: Newly created entry has "Share with Coach" toggle set to OFF (`sharedWithCoach: false`).
+- **Test 7.2 — Explicit Sharing Consent**: Toggle "Share with Coach" to active. Document updates in Firestore with `sharedWithCoach: true`; status badge appears in entry list.
+- **Test 7.3 — Silent Redirection for Non-Admins**: Attempt navigating to `/admin` as standard user without `admin: true` claim. Redirects quietly to `/` without leaking route existence.
+- **Test 7.4 — Coach Workspace Anonymized Dashboard**: Navigate to `/admin` as user with `admin: true`. Displays only reflections marked `sharedWithCoach: true`. Author identities are anonymized (e.g. `Client #8F2`).
+- **Test 7.5 — Immutable Admin Audit Logging**: Click on shared client reflection in Coach Workspace. Append-only log written to `/admin_audit_logs`. Direct updates or deletes to the log fail under Firestore rules.
+- **Test 7.6 — Token Claim Inspector & In-App Retry**: If token is stale, diagnostic panel displays claims status and provides "Refresh Token & Retry" button for immediate resolution.
 
-### Test Suite 8: Security Remediation & Repository Hygiene
-- **Test 8.1 — Environment Template Sanitization**: Inspect `.env.example`. All variables contain generic placeholders (`"your_..._here"`), with zero real keys or webhook URLs.
-- **Test 8.2 — Repository Secret Exclusion**: Inspect `.gitignore`. Confirms `.env*` is excluded and `!.env.example` is whitelisted. Verify no local `.env` is tracked in git.
+### Test Suite 8: Opt-In Slack Notifications & Content Sanitization (Directive 10)
+- **Test 8.1 — Default Inactivity**: Save entry with default settings. No HTTP calls to `/api/notifications/slack`.
+- **Test 8.2 — Opt-In & Trigger Mode Configuration**: Open Settings modal, toggle "Enable Slack Notifications" to ON, select "Gratitude". Preferences persist to `/users/{userId}` in Firestore.
+- **Test 8.3 — Mode-Filtered Server Dispatch**: Save reflection in **Gratitude** mode. After Firestore write confirmation, backend sanitizes excerpt and posts to Slack webhook. UI displays confirmation banner.
+- **Test 8.4 — Unselected Mode Suppression**: Save reflection in **Brainstorm** mode. Firestore saves, but Slack notification is suppressed.
+- **Test 8.5 — Content Sanitization & Truncation**: Submit entry with formatting marks and >400 characters. Slack preview escapes markdown characters, strips control characters, and truncates strictly at ~200 characters.
+- **Test 8.6 — Duplicate Suppression (Rate-Limiting)**: Edit same Gratitude entry multiple times. In-memory rate-limiter and session tracker skip redundant webhook calls (`skipped: true`).
+- **Test 8.7 — Mode Transition Lock Clearing**: Switch entry from Gratitude to Brainstorm and back to Gratitude. Intentional mode transition flag resets lock so the new Gratitude message dispatches properly.
+- **Test 8.8 — Test Ping Diagnostic**: Click "Send Test Ping" in Settings. Backend sends verified diagnostic ping to Slack channel confirming end-to-end integration.
+
+### Test Suite 9: Weekly AI Digest & Scheduler OIDC (Directive 11)
+- **Test 9.1 — Rejection of Unauthenticated Trigger**: Issue `POST /api/digest/weekly` without Authorization header. Returns `401 Unauthorized` with no internal execution details leaked.
+- **Test 9.2 — Valid OIDC Trigger Execution**: Issue `POST /api/digest/weekly` with valid signed OIDC token from `DIGEST_INVOKER_SA`. Returns `{ processed, sent, skipped, failed }` without leaking private entry content in response logs.
+- **Test 9.3 — Personal Webhook Delivery Isolation**: User receives weekly digest only at their configured `digestWebhookUrl`. Team channel receives no messages.
 
 ---
 
-## 12. OWASP Top 10 & LLM Security Compliance Checklist
+## 15. OWASP Top 10 & LLM Security Compliance Checklist
 
-- [x] **OWASP A01:2021 — Broken Access Control**: Owner-bound Firestore rules, custom claims verification, silent non-admin route redirection.
+- [x] **OWASP A01:2021 — Broken Access Control**: Owner-bound Firestore rules, custom claims verification, silent non-admin route redirection, OIDC token audience checks.
 - [x] **OWASP A02:2021 — Cryptographic Failures**: HTTPS in-transit encryption, Google Secret Manager for operational credentials (`GEMINI_API_KEY`, `SLACK_WEBHOOK_URL`), zero plain-text token storage, sanitized `.env.example`.
 - [x] **OWASP A03:2021 — Injection**: Schema-bound JSON request deserialization, strict coordinate numeric range checking, non-executable prompt assembly, Slack mrkdwn character escaping.
-- [x] **OWASP A04:2021 — Insecure Design**: Threat modeling applied across 8 zones, default-deny Firestore rules, user opt-in coach sharing, user opt-in external notifications.
+- [x] **OWASP A04:2021 — Insecure Design**: Threat modeling applied across 10 zones, default-deny Firestore rules, user opt-in coach sharing, user opt-in external notifications.
 - [x] **OWASP A05:2021 — Security Misconfiguration**: Explicit collection group wildcard rules, zero `allow read, write: if true;`, restrictive CORS and header policies.
-- [x] **OWASP A07:2021 — Identification & Authentication Failures**: Federated Google Sign-In with Firebase Auth, server-verified custom claims, automatic token refresh.
+- [x] **OWASP A07:2021 — Identification & Authentication Failures**: Federated Google Sign-In with Firebase Auth, server-verified custom claims, automatic token refresh, OIDC service account authentication.
 - [x] **OWASP A09:2021 — Security Logging & Monitoring Failures**: Immutable `admin_audit_logs` tracking every administrative access event.
 - [x] **OWASP A10:2021 — Server-Side Request Forgery (SSRF)**: Webhook destination validated strictly against `https://hooks.slack.com/services/` with arbitrary external URI inputs rejected.
 - [x] **OWASP LLM01 — Prompt Injection**: Server-segregated system instructions, non-executable user message framing, bounded temperature.
 - [x] **OWASP LLM02 — Insecure Output Handling**: Markdown sanitization and safe React component rendering to prevent XSS.
 - [x] **OWASP LLM05 — Supply Chain & Resource Exhaustion**: Resilient 4-stage model fallback ladder to prevent downtime during quota exhaustion or service degradation.
-- [x] **OWASP LLM06 — Sensitive Information Disclosure**: Anonymized client IDs in coach review mode, strict tenant-bound database partitioning, ~200-char truncated Slack excerpts.
+- [x] **OWASP LLM06 — Sensitive Information Disclosure**: Anonymized client IDs in coach review mode, strict tenant-bound database partitioning, ~200-char truncated Slack excerpts, personal digest webhooks separated from team channels.
 
 ---
 

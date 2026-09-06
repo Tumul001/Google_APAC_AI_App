@@ -8,7 +8,7 @@ import {
   subscribeToUserNotificationSettings,
   triggerSlackNotification,
 } from '../lib/firestore';
-import { requestGeminiReflection, requestGeminiSummary } from '../lib/geminiApi';
+import { requestGeminiReflection, requestGeminiSummary, streamGeminiReflection } from '../lib/geminiApi';
 import { EntryHistorySidebar } from './EntryHistorySidebar';
 import { JournalEditor } from './JournalEditor';
 import { AlertCircle, CheckCircle2, X, Bell } from 'lucide-react';
@@ -61,9 +61,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const pendingModeTransitionByEntryRef = useRef<Map<string, boolean>>(new Map());
   // Active entry ref to avoid stale closures in event handlers and async callbacks
   const activeEntryRef = useRef<JournalEntry | null>(null);
+  // Abort controller for cancelling ongoing Gemini generation requests
+  const abortControllerRef = useRef<AbortController | null>(null);
   useEffect(() => {
     activeEntryRef.current = activeEntry;
   }, [activeEntry]);
+
+  const handleStopGeneration = useCallback(() => {
+    if (abortControllerRef.current) {
+      debug('[Dashboard] Cancelling ongoing AI generation request via AbortController');
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsGeneratingAI(false);
+  }, []);
 
   // Helper to create a new blank entry
   const createNewEntry = useCallback(
@@ -319,9 +330,33 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     setActiveEntry(updatedWithUserMsg);
     await persistEntry(updatedWithUserMsg, { isModeTransition: hadPendingTransition });
 
-    // Call Gemini API
+    // Call Gemini API with streaming
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     setIsGeneratingAI(true);
     setErrorMessage(null);
+
+    const aiMsgId = `msg_${Date.now()}_m`;
+    let accumulatedText = '';
+    let usedModel = 'gemini-3.6-flash';
+
+    // Optimistically insert model message placeholder in UI
+    const streamingEntry: JournalEntry = {
+      ...updatedWithUserMsg,
+      messages: [
+        ...updatedWithUserMsg.messages,
+        {
+          id: aiMsgId,
+          role: 'model',
+          content: '',
+          timestamp: Date.now(),
+          modelUsed: usedModel,
+        },
+      ],
+      updatedAt: Date.now(),
+    };
+    activeEntryRef.current = streamingEntry;
+    setActiveEntry(streamingEntry);
 
     try {
       const messagesForGemini = updatedWithUserMsg.messages.map((m) => ({
@@ -329,32 +364,59 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         content: m.content,
       }));
 
-      const aiResponse = await requestGeminiReflection(messagesForGemini, updatedWithUserMsg.mode);
+      await streamGeminiReflection(
+        messagesForGemini,
+        updatedWithUserMsg.mode,
+        undefined,
+        (chunk) => {
+          accumulatedText += chunk.text;
+          if (chunk.modelUsed) usedModel = chunk.modelUsed;
 
-      const aiMessage: ChatMessage = {
-        id: `msg_${Date.now()}_m`,
-        role: 'model',
-        content: aiResponse.text,
-        timestamp: Date.now(),
-        modelUsed: aiResponse.modelUsed || 'gemini-3.6-flash',
-      };
-
-      const finalUpdatedEntry: JournalEntry = {
-        ...updatedWithUserMsg,
-        messages: [...updatedWithUserMsg.messages, aiMessage],
-        updatedAt: Date.now(),
-      };
-
-      activeEntryRef.current = finalUpdatedEntry;
-      setActiveEntry(finalUpdatedEntry);
-      await persistEntry(finalUpdatedEntry);
-    } catch (err: any) {
-      console.error('Error generating AI response:', err);
-      setErrorMessage(
-        `Gemini reflection error: ${err?.message || 'Could not communicate with AI model. Please retry.'}`
+          setActiveEntry((prev) => {
+            if (!prev || prev.id !== currentEntry.id) return prev;
+            const updatedMessages = prev.messages.map((m) =>
+              m.id === aiMsgId ? { ...m, content: accumulatedText, modelUsed: usedModel } : m
+            );
+            const nextEntry = {
+              ...prev,
+              messages: updatedMessages,
+              updatedAt: Date.now(),
+            };
+            activeEntryRef.current = nextEntry;
+            return nextEntry;
+          });
+        },
+        controller.signal
       );
+    } catch (err: any) {
+      if (err?.name === 'AbortError' || controller.signal.aborted) {
+        debug('[Dashboard] AI generation stopped by user.');
+      } else {
+        console.error('Error generating AI response:', err);
+        setErrorMessage(
+          `Gemini reflection error: ${err?.message || 'Could not communicate with AI model. Please retry.'}`
+        );
+      }
     } finally {
       setIsGeneratingAI(false);
+      abortControllerRef.current = null;
+
+      const current = activeEntryRef.current;
+      if (current && current.id === currentEntry.id) {
+        if (!accumulatedText.trim()) {
+          // If stopped before any token arrived, prune empty model placeholder
+          const cleaned = {
+            ...current,
+            messages: current.messages.filter((m) => m.id !== aiMsgId),
+          };
+          activeEntryRef.current = cleaned;
+          setActiveEntry(cleaned);
+          await persistEntry(cleaned);
+        } else {
+          // Persist the full or partial generated content cleanly
+          await persistEntry(current);
+        }
+      }
     }
   };
 
@@ -497,6 +559,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           onGenerateSummary={handleGenerateSummary}
           isGeneratingAI={isGeneratingAI}
           isGeneratingSummary={isGeneratingSummary}
+          onStopGeneration={handleStopGeneration}
           saveStatus={saveStatus}
           onRetrySave={handleRetrySave}
           onToggleSidebarMobile={() => setMobileSidebarOpen(true)}
