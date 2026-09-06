@@ -4,12 +4,13 @@ import {
   MapPin,
   Search,
   Navigation,
-  X,
   Check,
   AlertCircle,
   Loader2,
 } from 'lucide-react';
 import type { EntryLocation } from '../types';
+import { Modal } from './Modal';
+import { btnPrimary, btnSecondary, cardQuiet, field } from '../lib/ui';
 
 interface LocationPickerModalProps {
   isOpen: boolean;
@@ -93,7 +94,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
     if (!text) return;
 
     setIsFetchingSuggestions(true);
-    setStatusMessage(`Searching for "${text}"...`);
+    setStatusMessage(`Searching for “${text}”…`);
     setIsError(false);
 
     // 1. Try Google Places Autocomplete first if places library is loaded
@@ -147,7 +148,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
 
     setIsFetchingSuggestions(false);
     setIsError(true);
-    setStatusMessage(`No locations found for "${text}". Try another place name.`);
+    setStatusMessage(`No locations found for “${text}”. Try searching a nearby landmark.`);
   };
 
   // Handle user selecting an autocomplete suggestion
@@ -156,7 +157,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
   ) => {
     if (!suggestion.placePrediction) return;
 
-    setStatusMessage('Fetching place details...');
+    setStatusMessage('Fetching place details…');
     setIsError(false);
 
     try {
@@ -200,14 +201,17 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
     }
 
     setIsLocating(true);
-    setStatusMessage('Requesting browser location permission...');
+    setStatusMessage('Requesting browser location permission…');
     setIsError(false);
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const lat = Number(position.coords.latitude.toFixed(6));
         const lng = Number(position.coords.longitude.toFixed(6));
-        let placeName = `Current Location (${lat.toFixed(3)}°, ${lng.toFixed(3)}°)`;
+        // Only a resolved name is a name. If the lookup fails the entry is
+        // tagged as a pin, and the modal says so rather than dressing raw
+        // coordinates up as a location.
+        let placeName = '';
 
         // Attempt reverse resolution with Places API New searchNearby if available
         try {
@@ -229,9 +233,17 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
           // Fallback gracefully to coordinates placeName
         }
 
-        setSelectedLocation({ lat, lng, placeName });
+        if (placeName) {
+          setSelectedLocation({ lat, lng, placeName });
+          setStatusMessage(null);
+        } else {
+          setSelectedLocation({ lat, lng, placeName: 'Dropped pin' });
+          setIsError(false);
+          setStatusMessage(
+            'Found your position but not a name for it. Saved as a dropped pin; search above to name it.'
+          );
+        }
         setIsLocating(false);
-        setStatusMessage(null);
       },
       (geoError) => {
         setIsLocating(false);
@@ -252,57 +264,60 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
     onClose();
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/50 backdrop-blur-xs p-4">
-      <div className="relative w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl border border-stone-200 animate-in fade-in zoom-in-95 duration-150">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-stone-100 pb-3.5">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-stone-100 text-stone-700 border border-stone-200/80">
-              <MapPin className="h-4 w-4" />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-stone-900 font-sans">Tag Location</h3>
-              <p className="text-[11px] text-stone-500">
-                Attach a location or place to your journal entry
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors cursor-pointer"
-          >
-            <X className="h-4 w-4" />
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      size="md"
+      labelId="location-picker-title"
+      icon={<MapPin className="h-[18px] w-[18px]" aria-hidden="true" />}
+      title={
+        <>
+          Tag a <em className="font-serif font-normal italic">place</em>
+        </>
+      }
+      subtitle="Attach a location to this entry. Nothing is recorded unless you confirm."
+      footer={
+        <>
+          <button type="button" onClick={onClose} className={btnSecondary}>
+            Cancel
           </button>
-        </div>
-
-        {/* Modal Body */}
-        <div className="mt-4 space-y-4">
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={!selectedLocation}
+            className={btnPrimary}
+          >
+            <Check className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>Confirm location</span>
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-4">
           {/* Action 1: Use Current Location */}
           <button
             type="button"
             onClick={handleUseCurrentLocation}
             disabled={isLocating}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-stone-200 bg-stone-50/80 px-4 py-2.5 text-xs font-medium text-stone-800 hover:bg-stone-100 disabled:opacity-60 transition-colors cursor-pointer"
+            className={`${btnSecondary} w-full`}
           >
             {isLocating ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin text-stone-600" />
-                <span>Locating with browser GPS...</span>
+                <Loader2 className="h-4 w-4 animate-spin text-ink-soft motion-reduce:animate-none" aria-hidden="true" />
+                <span>Locating with browser GPS…</span>
               </>
             ) : (
               <>
-                <Navigation className="h-4 w-4 text-stone-700" />
-                <span>Use My Current Location</span>
+                <Navigation className="h-4 w-4 text-ink-secondary" />
+                <span>Use my current location</span>
               </>
             )}
           </button>
 
           <div className="relative flex items-center justify-center">
-            <div className="w-full border-t border-stone-200" />
-            <span className="absolute bg-white px-2 text-[10px] uppercase tracking-wider text-stone-400 font-mono">
+            <div className="w-full border-t border-line" />
+            <span className="absolute bg-surface px-2 text-meta uppercase tracking-wider text-ink-faint font-mono">
               Or search by place
             </span>
           </div>
@@ -310,7 +325,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
           {/* Action 2: Autocomplete Search */}
           <div className="relative">
             <div className="relative flex items-center">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-stone-400" />
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-ink-faint" />
               <input
                 type="text"
                 value={searchQuery}
@@ -321,18 +336,18 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
                     handleDirectSearch();
                   }
                 }}
-                placeholder="Search city, café, landmark, address... (Press Enter)"
-                className="w-full rounded-xl border border-stone-200 bg-white pl-9 pr-16 py-2 text-xs text-stone-900 placeholder:text-stone-400 focus:border-stone-400 focus:outline-hidden"
+                placeholder="Search a city, café, landmark or address…"
+                className={`${field} pl-9 pr-16`}
               />
               <div className="absolute right-1.5 flex items-center gap-1">
                 {isFetchingSuggestions ? (
-                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin text-stone-400" />
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin text-ink-faint motion-reduce:animate-none" aria-hidden="true" />
                 ) : (
                   searchQuery.trim().length > 0 && (
                     <button
                       type="button"
                       onClick={() => handleDirectSearch()}
-                      className="rounded-lg bg-stone-100 px-2 py-1 text-[11px] font-medium text-stone-700 hover:bg-stone-200 transition-colors cursor-pointer"
+                      className="cursor-pointer rounded-lg bg-subtle px-2 py-1 text-meta font-medium text-ink-secondary transition-colors duration-150 hover:bg-muted-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink motion-reduce:transition-none"
                     >
                       Find
                     </button>
@@ -343,19 +358,19 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
 
             {/* Suggestions Dropdown */}
             {suggestions.length > 0 && (
-              <ul className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-xl border border-stone-200 bg-white p-1 shadow-lg text-xs">
+              <ul className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-xl border border-line bg-surface p-1 shadow-lg text-meta">
                 {suggestions.map((sug, idx) => (
-                  <li
-                    key={idx}
-                    onClick={() => handleSelectSuggestion(sug)}
-                    className="flex items-start gap-2 rounded-lg px-2.5 py-2 cursor-pointer hover:bg-stone-100 transition-colors text-stone-800"
-                  >
-                    <MapPin className="h-3.5 w-3.5 text-stone-400 shrink-0 mt-0.5" />
-                    <div className="min-w-0">
-                      <p className="font-medium text-stone-900 truncate">
+                  <li key={idx}>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectSuggestion(sug)}
+                      className="flex w-full cursor-pointer items-start gap-2 rounded-lg px-2.5 py-2 text-left text-ink-body transition-colors duration-150 hover:bg-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink motion-reduce:transition-none"
+                    >
+                      <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden="true" />
+                      <span className="min-w-0 truncate font-medium text-ink">
                         {sug.placePrediction?.text?.text}
-                      </p>
-                    </div>
+                      </span>
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -365,10 +380,10 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
           {/* Status / Error feedback */}
           {statusMessage && (
             <div
-              className={`flex items-center gap-2 rounded-lg p-2.5 text-xs ${
+              className={`flex items-center gap-2 rounded-lg p-2.5 text-meta ${
                 isError
                   ? 'bg-red-50 text-red-700 border border-red-200'
-                  : 'bg-stone-100 text-stone-700'
+                  : 'bg-subtle text-ink-secondary'
               }`}
             >
               {isError && <AlertCircle className="h-3.5 w-3.5 shrink-0" />}
@@ -378,17 +393,17 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
 
           {/* Selected Location Preview */}
           {selectedLocation && (
-            <div className="rounded-xl border border-stone-200 bg-stone-50/60 p-3 space-y-2">
+            <div className={`${cardQuiet} space-y-2 p-3`}>
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-stone-900 text-stone-50 shrink-0">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-inverse text-on-inverse shrink-0">
                     <Check className="h-3.5 w-3.5" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold text-stone-900 truncate font-sans">
+                    <p className="text-meta font-semibold text-ink truncate">
                       {selectedLocation.placeName}
                     </p>
-                    <p className="text-[10px] text-stone-400 font-mono">
+                    <p className="text-meta text-ink-faint font-mono">
                       {selectedLocation.lat.toFixed(4)}°, {selectedLocation.lng.toFixed(4)}°
                     </p>
                   </div>
@@ -396,14 +411,14 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setSelectedLocation(null)}
-                  className="text-[11px] font-medium text-stone-400 hover:text-stone-700 transition-colors cursor-pointer"
+                  className="text-meta font-medium text-ink-faint hover:text-ink-secondary transition-colors cursor-pointer"
                 >
                   Clear
                 </button>
               </div>
 
               {/* Map Preview iframe */}
-              <div className="h-28 w-full overflow-hidden rounded-lg border border-stone-200 bg-white">
+              <div className="h-28 w-full overflow-hidden rounded-lg border border-line bg-surface">
                 <iframe
                   title="Selected location preview"
                   src={`https://maps.google.com/maps?q=${selectedLocation.lat},${selectedLocation.lng}&z=14&output=embed`}
@@ -413,28 +428,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
               </div>
             </div>
           )}
-        </div>
-
-        {/* Modal Footer */}
-        <div className="mt-5 flex items-center justify-end gap-2 border-t border-stone-100 pt-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-100 transition-colors cursor-pointer"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleConfirm}
-            disabled={!selectedLocation}
-            className="flex items-center gap-1.5 rounded-lg bg-stone-900 px-4 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-stone-800 disabled:opacity-40 transition-colors cursor-pointer"
-          >
-            <Check className="h-3.5 w-3.5" />
-            <span>Confirm Location</span>
-          </button>
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 };

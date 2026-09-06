@@ -6,3 +6,10 @@ coverage/
 *.log
 .env*
 !.env.example
+.claude/
+.gemini/
+.kiro/
+.pi/
+.qoder/
+.rovodev/
+.vibe/

@@ -1,24 +1,120 @@
 @import "tailwindcss";
 
+/* ─────────────────────────────────────────────────────────────
+   Semantic colour roles.
+
+   Each role aliases the palette value already in use, so the rendered
+   colour is bit-identical today — including on wide-gamut displays, since
+   Tailwind's stone ramp is OKLCH and these inherit it rather than
+   re-specifying it in sRGB. What changes is where the values live: a theme
+   swap (or a dark theme) remaps the roles below instead of editing colour
+   classes across 11 components.
+
+   Tailwind v4 generates utilities from these automatically —
+   `--color-surface` yields bg-surface / text-surface / border-surface.
+   ───────────────────────────────────────────────────────────── */
+@theme {
+  /* ── Type ──────────────────────────────────────────────────
+     Declared here, not in @layer base. Tailwind's own font-sans /
+     font-serif / font-mono utilities live in the utilities layer and
+     beat anything set in base — which is why the Newsreader accent
+     word silently rendered as Georgia until now. Setting the theme
+     vars makes the utilities themselves resolve to these families.
+
+     Chrome speaks IBM Plex Sans. The writing — entry prose and
+     Gemini's replies — speaks Newsreader, because this product is
+     prose, not data. */
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-serif: "Newsreader", Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Role scale. Five steps, each with leading tuned to its measure —
+     replaces eight ad-hoc sizes and nine line-heights. */
+  --text-meta: 0.75rem;           /* 12px — timestamps, counts, chips */
+  --text-meta--line-height: 1.5;
+  --text-ui: 0.875rem;            /* 14px — labels, buttons, controls */
+  --text-ui--line-height: 1.5;
+  --text-body: 1rem;              /* 16px — prose, entries, replies */
+  --text-body--line-height: 1.65;
+  --text-title: 1.125rem;         /* 18px — panel and entry titles */
+  --text-title--line-height: 1.35;
+  --text-section: 1.375rem;       /* 22px — section headings */
+  --text-section--line-height: 1.25;
+
+  /* Surfaces, furthest back to nearest front */
+  --color-canvas: var(--color-stone-50);          /* app background */
+  --color-surface: var(--color-white);            /* cards, panels, modals */
+  --color-subtle: var(--color-stone-100);         /* inset wells, icon chips */
+  --color-muted-surface: var(--color-stone-200);  /* pressed, avatar fallback */
+  --color-inverse: var(--color-stone-900);        /* primary buttons, dark chips */
+  --color-inverse-hover: var(--color-stone-800);
+
+  /* Text, strongest to weakest */
+  --color-ink: var(--color-stone-900);            /* headings, primary text */
+  --color-ink-body: var(--color-stone-800);       /* message body */
+  --color-ink-secondary: var(--color-stone-700);  /* labels, controls */
+  --color-ink-soft: var(--color-stone-600);       /* supporting copy */
+  --color-ink-muted: var(--color-stone-500);      /* metadata, timestamps */
+  --color-ink-faint: var(--color-stone-400);      /* icon glyphs, placeholders */
+  --color-on-inverse: var(--color-stone-50);      /* text on dark surfaces */
+
+  /* Lines */
+  --color-line: var(--color-stone-200);           /* default divider */
+  --color-line-strong: var(--color-stone-300);    /* input and button borders */
+  --color-line-subtle: var(--color-stone-100);    /* hairlines inside cards */
+  --color-line-emphasis: var(--color-stone-400);  /* selected / active control border */
+  --color-on-inverse-soft: var(--color-stone-200); /* secondary text on dark surfaces */
+  --color-ink-ghost: var(--color-stone-300);      /* empty-state glyphs, separators */
+
+  /* Meaning. These are the only hues in the product and each carries
+     exactly one meaning on every surface. */
+  --color-saved: var(--color-emerald-600);        /* saved, protected */
+  --color-danger: var(--color-red-600);           /* errors, destructive */
+  --color-insight: var(--color-amber-800);        /* AI summary */
+  --color-place: var(--color-rose-600);           /* location */
+}
+
+
 @layer base {
+  /* Surfaces the browser owns. Left at defaults these are the clearest tell
+     that a page was assembled rather than designed. */
+  ::selection {
+    background-color: var(--color-muted-surface);
+    color: var(--color-ink);
+  }
+
+  :root {
+    /* Firefox scrollbar; the WebKit equivalent is further down. */
+    scrollbar-color: var(--color-line-strong) transparent;
+    scrollbar-width: thin;
+    accent-color: var(--color-inverse);
+  }
+
+  textarea,
+  input {
+    caret-color: var(--color-inverse);
+  }
+
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "SF Pro", "San Francisco", "Helvetica Neue", Helvetica, Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-  }
-
-  .font-sans {
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "SF Pro", "San Francisco", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  }
-
-  .font-serif {
-    font-family: "Newsreader", Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
+    text-rendering: optimizeLegibility;
   }
 }
 
-/* Refined Markdown Formatting for Reflections */
+/* The reading surface. Journal entries and Gemini's replies are prose,
+   so they are set in the serif at a comfortable measure and leading. */
 .markdown-body {
   word-break: break-word;
+  font-family: var(--font-serif);
+  font-size: var(--text-body);
+  line-height: var(--text-body--line-height);
+  font-optical-sizing: auto;
+}
+
+.markdown-body strong {
+  /* Newsreader's 600 carries emphasis better than a synthesised bold. */
+  font-weight: 600;
 }
 
 .markdown-body p {
@@ -82,7 +178,7 @@
 }
 
 .markdown-body code {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.85em;
   background-color: rgba(0, 0, 0, 0.06);
   padding: 0.15rem 0.3rem;
@@ -129,10 +225,20 @@
   background-color: #fafaf9;
 }
 
-/* Custom Scrollbar */
+/* Scrollbars.
+   A 6px bar hard against the edge reads as a leftover. This is a rounded thumb
+   that floats in its own gutter: the track stays transparent, and the thumb is
+   inset by a transparent border with background-clip so the pill never touches
+   the container wall. Colour comes from the token ramp, and it darkens on
+   hover like every other interactive surface in the app. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 12px;
+  height: 12px;
 }
 
 ::-webkit-scrollbar-track {
@@ -140,10 +246,89 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(120, 113, 108, 0.2);
-  border-radius: 3px;
+  background-color: var(--color-line-strong);
+  background-clip: content-box;
+  border: 3px solid transparent;
+  border-radius: 9999px;
+  transition: background-color 150ms ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(120, 113, 108, 0.4);
+  background-color: var(--color-ink-faint);
+}
+
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--color-ink-muted);
+}
+
+/* Where both axes can scroll, the meeting square inherits the page, not grey. */
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::-webkit-scrollbar-thumb {
+    transition: none;
+  }
+}
+
+/* Landing hero backdrop — scoped to a single decorative element in LandingPage.tsx.
+   Single-class selector, no descendants, so it cannot reach any other component.
+   Colors: #FFFFFF / #FAFAF9 surfaces + #1C1917 hairlines at low alpha (existing stone tokens only). */
+.landing-texture {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      rgba(28, 25, 23, 0.045) 0px,
+      rgba(28, 25, 23, 0.045) 1px,
+      transparent 1px,
+      transparent 8px
+    ),
+    linear-gradient(180deg, #ffffff 0%, #fafaf9 100%);
+  -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, #000 22%, #000 58%, rgba(0, 0, 0, 0) 100%);
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, #000 22%, #000 58%, rgba(0, 0, 0, 0) 100%);
+}
+
+/* Horizontal chip rows hide their scrollbar; the row itself is the affordance. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Overlay entrance.
+   A dialog that appears with no transition reads as a page swap rather than a
+   layer opening above the page. 160ms is under the perception threshold for
+   latency while still explaining where the panel came from.
+   Under reduced motion the movement drops and only the fade remains, so the
+   state change stays legible without spatial motion. */
+@keyframes modal-overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes modal-panel-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-overlay {
+  animation: modal-overlay-in 160ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.modal-panel {
+  animation: modal-panel-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: center top;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-panel {
+    animation: modal-overlay-in 160ms ease both;
+  }
 }

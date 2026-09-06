@@ -3,6 +3,13 @@ import path from 'path';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 import { createServer as createViteServer } from 'vite';
+import { initializeApp as initAdminApp, getApps as getAdminApps, applicationDefault } from 'firebase-admin/app';
+import { getFirestore as getAdminFirestore, type Firestore } from 'firebase-admin/firestore';
+// Resolved through firebase-admin, which already depends on it. Not declared in
+// package.json by decision: if a future firebase-admin restructure drops it,
+// this import fails loudly at boot rather than silently weakening the check.
+import { OAuth2Client } from 'google-auth-library';
+import firebaseConfig from './firebase-applet-config.json';
 
 dotenv.config();
 
@@ -21,6 +28,31 @@ const MODEL_FALLBACK_LADDER = [
   'gemini-3.7-flash',
   'gemini-3.8-flash',
 ];
+
+let adminDb: Firestore | null = null;
+
+/**
+ * Admin Firestore, created on first use so the server still boots locally
+ * without credentials. On Cloud Run this picks up the service account through
+ * Application Default Credentials; locally it needs GOOGLE_APPLICATION_CREDENTIALS.
+ *
+ * This client bypasses firestore.rules completely, which is why the only route
+ * that touches it is the OIDC-gated digest job below.
+ */
+function getAdminDb(): Firestore {
+  if (!adminDb) {
+    const app =
+      getAdminApps().length === 0
+        ? initAdminApp({ credential: applicationDefault(), projectId: firebaseConfig.projectId })
+        : getAdminApps()[0];
+    const databaseId = firebaseConfig.firestoreDatabaseId;
+    adminDb =
+      databaseId && databaseId !== '(default)'
+        ? getAdminFirestore(app, databaseId)
+        : getAdminFirestore(app);
+  }
+  return adminDb;
+}
 
 let genAIClient: GoogleGenAI | null = null;
 
@@ -48,20 +80,58 @@ async function generateContentWithFallback(
   const ai = getGenAI();
   let lastError: any = null;
 
-  // Build appropriate system prompt based on mode
-  let defaultSystemPrompt = `You are a thoughtful, empathetic, and intellectually curious journaling companion and reflection guide.
-Your goal is to help the user explore their thoughts, reflect on daily experiences, brainstorm constructive solutions, and uncover deeper insights.
-- Be supportive, articulate, and respectful.
-- Provide structured, digestible thoughts (bullet points or short paragraphs where appropriate).
-- If the user asks for brainstorming or problem solving, provide creative, actionable ideas.
-- Offer constructive reflection questions to encourage deeper self-discovery.`;
+  /**
+   * Voice rules, shared by every mode.
+   *
+   * The previous prompts asked for "thoughtful, empathetic, and intellectually
+   * curious… supportive, articulate, and respectful", which is a specification
+   * for exactly the openers users kept seeing: "This is such a wonderful
+   * question", "That is one of the most clarifying things you can ask
+   * yourself." Praise before substance, then a tidy list of three.
+   *
+   * These bans are explicit because models default to that register.
+   */
+  const VOICE = `How to write:
+- Open on substance. Never begin with praise, thanks, or a remark about the question itself. Banned openers include "great question", "what a thoughtful", "this is such a", "thank you for sharing", "I love that", "that is one of the most".
+- Never tell the person their question or feeling is wonderful, powerful, profound, or brave.
+- Plain words. No wellness-brand abstractions, no corporate nouns, no motivational-poster phrasing.
+- Do not default to lists of three. Use a list only when the items are genuinely parallel and the person needs to compare them; otherwise write prose.
+- Prefer two or three short paragraphs over bullets.
+- Do not restate what they wrote before responding to it.
+- You are a writing partner, not a therapist or a coach. Do not diagnose, prescribe, or reassure reflexively.
+- If what they wrote is vague, ask for the missing specific before interpreting anything.
+- Close with at most one question, and only if it could not have been asked before reading their words.`;
+
+  let defaultSystemPrompt = `You are a reflective writing partner inside someone's private journal.
+
+Help the person look at what they wrote and see it more clearly. Notice what they said sideways, what they left out, and where two things they believe are in tension. Stay with their material rather than generalising away from it.
+
+${VOICE}`;
 
   if (mode === 'brainstorm') {
-    defaultSystemPrompt = `You are an imaginative, structured creative ideation partner and strategic sounding board.
-Help the user expand their ideas, break down complex challenges, identify unexpected angles, and outline practical next steps.`;
+    defaultSystemPrompt = `You are a thinking partner working a problem with someone in their private journal.
+
+Give real options that differ in kind, not the same idea reworded. Say which one you would pursue and why. Push back when the premise looks weak, and name the constraint they have not mentioned. Concrete beats comprehensive.
+
+${VOICE}`;
+  } else if (mode === 'deep_thinking') {
+    defaultSystemPrompt = `You are a rigorous interlocutor in someone's private journal.
+
+Find the assumption underneath what they wrote and test it. Argue the opposing case properly, as its strongest version, not a straw one. Separate what they know from what they are inferring. Precision matters more than comfort here, but you are examining an idea, never the person.
+
+${VOICE}`;
+  } else if (mode === 'gratitude') {
+    defaultSystemPrompt = `You are a close reader of someone's private gratitude entry.
+
+Take what they noticed seriously and look closer at it: who else was involved, what it cost someone, what would be missing without it. Specific and concrete. Do not inflate a small thing into a life lesson, and do not congratulate them for being grateful.
+
+${VOICE}`;
   } else if (mode === 'summary') {
-    defaultSystemPrompt = `You are an expert executive summarizer and reflective analyst.
-Summarize the core themes, emotional tone, key realizations, and actionable next steps from the user's journal entry in an elegant, structured format.`;
+    defaultSystemPrompt = `You summarise a journal conversation for the person who wrote it, in their own second person.
+
+Report only what is actually in the text. Never invent a realisation they did not have. If the conversation did not reach anything, say that plainly instead of manufacturing a takeaway.
+
+${VOICE}`;
   }
 
   const promptToUse = systemInstruction || defaultSystemPrompt;
@@ -413,6 +483,231 @@ app.post('/api/notifications/slack', async (req, res) => {
   }
 });
 
+/* ───────────────────────────────────────────────────────────────────────────
+   Weekly digest
+
+   Cloud Run serves the web app, so it runs --allow-unauthenticated and IAM does
+   NOT gate this route. The token check below is the only thing between the open
+   internet and every user's private journal, because the handler reads with the
+   Admin SDK and firestore.rules do not apply to it.
+
+   No directive document was available for this feature, so the rules applied
+   here are stated explicitly:
+     - verify signature, issuer, audience and the caller's service-account email;
+     - read one user at a time, never a cross-user join;
+     - bound how much of anyone's journal can be read or sent;
+     - a digest goes only to that user's own webhook, never the shared channel;
+     - respond with counts only, never content.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const oidcClient = new OAuth2Client();
+
+const DIGEST_MAX_USERS = 200;      // one Gemini call each; a ceiling on cost and runtime
+const DIGEST_MAX_ENTRIES = 40;     // per user, most recent first
+const DIGEST_EXCERPT_CHARS = 220;  // per entry, sent to Gemini
+const DIGEST_SLACK_CHARS = 1200;   // the sanitised summary posted to Slack
+const DIGEST_MIN_INTERVAL_MS = 6 * 24 * 60 * 60 * 1000; // scheduler retries must not re-send
+
+interface SchedulerIdentity {
+  email: string;
+}
+
+/**
+ * Accepts only a Google-signed OIDC token whose audience is this endpoint and
+ * whose subject is an allowlisted service account. Everything else is a bare 401.
+ */
+async function verifySchedulerToken(req: express.Request): Promise<SchedulerIdentity | null> {
+  const header = req.headers.authorization || '';
+  if (!header.startsWith('Bearer ')) return null;
+  const token = header.slice(7).trim();
+  if (!token) return null;
+
+  const audience = process.env.DIGEST_AUDIENCE?.trim();
+  const allowed = (process.env.DIGEST_INVOKER_SA || '')
+    .split(',')
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean);
+
+  // Fail closed: an unconfigured deployment must not accept any caller.
+  if (!audience || allowed.length === 0) {
+    console.error('[Digest] DIGEST_AUDIENCE or DIGEST_INVOKER_SA is not configured; refusing all callers.');
+    return null;
+  }
+
+  try {
+    const ticket = await oidcClient.verifyIdToken({ idToken: token, audience });
+    const payload = ticket.getPayload();
+    if (!payload) return null;
+
+    const issuer = payload.iss;
+    if (issuer !== 'https://accounts.google.com' && issuer !== 'accounts.google.com') return null;
+    if (payload.email_verified !== true) return null;
+
+    const email = (payload.email || '').toLowerCase();
+    if (!email || !allowed.includes(email)) return null;
+
+    return { email };
+  } catch (err: any) {
+    console.warn('[Digest] Token rejected:', err?.message || 'verification failed');
+    return null;
+  }
+}
+
+interface DigestEntry {
+  title: string;
+  mode: string;
+  excerpt: string;
+}
+
+/** First thing the person actually wrote, trimmed. Never the whole thread. */
+function firstUserExcerpt(messages: unknown): string {
+  if (!Array.isArray(messages)) return '';
+  const first = messages.find(
+    (m: any) => m && m.role === 'user' && typeof m.content === 'string' && m.content.trim()
+  ) as any;
+  if (!first) return '';
+  return String(first.content).replace(/\s+/g, ' ').trim().slice(0, DIGEST_EXCERPT_CHARS);
+}
+
+async function buildDigestText(entries: DigestEntry[]): Promise<string> {
+  const lines = entries
+    .map((e, i) => `${i + 1}. [${e.mode}] ${e.title}${e.excerpt ? ` — ${e.excerpt}` : ''}`)
+    .join('\n');
+
+  const prompt = `Below are the journal entries one person wrote this week: the title of each, its mode, and how it opened.
+
+${lines}
+
+Write them a short summary of their week. Name the themes that actually recur and any pattern worth noticing — which modes they reached for, what they returned to more than once. Warm, but do not flatter or congratulate them for journalling. Under 140 words. No headings, no bullet list.`;
+
+  const result = await generateContentWithFallback([{ role: 'user', content: prompt }], undefined, 'summary');
+  return result.text || '';
+}
+
+app.post('/api/digest/weekly', async (req, res) => {
+  const caller = await verifySchedulerToken(req);
+  if (!caller) {
+    // No detail: an attacker learns nothing about why it failed.
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  const startedAt = Date.now();
+  const since = startedAt - 7 * 24 * 60 * 60 * 1000;
+  let processed = 0;
+  let sent = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  try {
+    const db = getAdminDb();
+    const optedIn = await db
+      .collection('users')
+      .where('notificationSettings.weeklyDigestEnabled', '==', true)
+      .limit(DIGEST_MAX_USERS)
+      .get();
+
+    console.log(`[Digest] Run started by ${caller.email}: ${optedIn.size} opted-in user(s).`);
+
+    for (const userDoc of optedIn.docs) {
+      processed += 1;
+      const settings = (userDoc.data()?.notificationSettings ?? {}) as Record<string, unknown>;
+      const webhook = typeof settings.digestWebhookUrl === 'string' ? settings.digestWebhookUrl.trim() : '';
+      const lastSentAt = typeof settings.lastDigestSentAt === 'number' ? settings.lastDigestSentAt : 0;
+
+      // Their own destination only. The shared SLACK_WEBHOOK_URL is never a
+      // fallback here: it would publish one person's week to the whole team.
+      if (!webhook.startsWith('https://hooks.slack.com/services/')) {
+        skipped += 1;
+        continue;
+      }
+      if (startedAt - lastSentAt < DIGEST_MIN_INTERVAL_MS) {
+        skipped += 1;
+        continue;
+      }
+
+      try {
+        const snap = await db
+          .collection('users')
+          .doc(userDoc.id)
+          .collection('interactions')
+          .where('updatedAt', '>=', since)
+          .orderBy('updatedAt', 'desc')
+          .limit(DIGEST_MAX_ENTRIES)
+          .get();
+
+        if (snap.empty) {
+          skipped += 1;
+          continue;
+        }
+
+        const entries: DigestEntry[] = snap.docs.map((d) => {
+          const data = d.data();
+          return {
+            title: String(data.title || 'Untitled entry').slice(0, 120),
+            mode: String(data.mode || 'reflection'),
+            excerpt: firstUserExcerpt(data.messages),
+          };
+        });
+
+        const summary = await buildDigestText(entries);
+        if (!summary.trim()) {
+          failed += 1;
+          continue;
+        }
+
+        const body = sanitizeSlackContent(summary, DIGEST_SLACK_CHARS);
+        const period = `${new Date(since).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – ${new Date(startedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`;
+
+        const slackResponse = await fetch(webhook, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: `Your week in review · ${period}`,
+            blocks: [
+              {
+                type: 'header',
+                text: { type: 'plain_text', text: `Your week in review`, emoji: true },
+              },
+              {
+                type: 'context',
+                elements: [
+                  {
+                    type: 'mrkdwn',
+                    text: `${period} • ${entries.length} ${entries.length === 1 ? 'entry' : 'entries'}`,
+                  },
+                ],
+              },
+              { type: 'section', text: { type: 'mrkdwn', text: body } },
+            ],
+          }),
+        });
+
+        if (!slackResponse.ok) {
+          failed += 1;
+          console.warn(`[Digest] Slack rejected the digest for one user: HTTP ${slackResponse.status}`);
+          continue;
+        }
+
+        await userDoc.ref.set(
+          { notificationSettings: { lastDigestSentAt: startedAt } },
+          { merge: true }
+        );
+        sent += 1;
+      } catch (userErr: any) {
+        // One user's failure must not stop the run. No content in the log.
+        failed += 1;
+        console.warn('[Digest] Failed for one user:', userErr?.message || 'unknown error');
+      }
+    }
+
+    console.log(`[Digest] Finished in ${Date.now() - startedAt}ms — sent ${sent}, skipped ${skipped}, failed ${failed}.`);
+    return res.json({ success: true, processed, sent, skipped, failed });
+  } catch (error: any) {
+    console.error('[Digest] Run aborted:', error?.message || error);
+    return res.status(500).json({ success: false, error: 'Digest run failed.' });
+  }
+});
+
 // Gemini Reflection and Journaling Chat Endpoint
 app.post('/api/gemini/reflect', async (req, res) => {
   try {
@@ -471,20 +766,23 @@ app.post('/api/gemini/summarize', async (req, res) => {
       });
     }
 
-    const prompt = `Please analyze the following journal entry/reflection session:
-Title: ${title || 'Untitled Session'}
-Entry Content:
+    const prompt = `Here is a journal conversation. Summarise it for the person who wrote it.
+
+Title: ${title || 'Untitled entry'}
+
 ${content}
 
-Provide a concise, thoughtful breakdown with:
-1. **Core Theme & Key Takeaway** (1-2 sentences)
-2. **Emotional & Mindset Insights** (Observed tone, mindset shifts, or underlying feelings)
-3. **Actionable Suggestions / Next Steps** (2-3 realistic bullet points)
-4. **Follow-Up Reflection Prompt** (A thought-provoking question for future entries)`;
+Use exactly these headings, in this order, in sentence case:
+
+**What this was about** — the actual subject, in one or two sentences. Not a restatement of the title.
+**What shifted** — anything they worked out, changed their mind about, or noticed. If nothing shifted, write that.
+**Worth trying** — one or two concrete things, drawn from what they wrote. Skip this heading entirely if the conversation does not support it.
+
+Keep the whole thing under 150 words.`;
 
     const result = await generateContentWithFallback(
       [{ role: 'user', content: prompt }],
-      'You are an expert reflective analyst and mindfulness mentor.',
+      undefined,
       'summary'
     );
 

@@ -1,157 +1,230 @@
 import React from 'react';
-import { ShieldAlert, ShieldCheck, X, Lock, Key, Database, Cpu, EyeOff } from 'lucide-react';
+import {
+  ShieldCheck,
+  ShieldAlert,
+  Lock,
+  Key,
+  Database,
+  Cpu,
+  EyeOff,
+  MapPin,
+  UserCheck,
+} from 'lucide-react';
+import { Modal } from './Modal';
+import { btnPrimary, cardQuiet, chipEmerald, sectionLabel } from '../lib/ui';
 
 interface ThreatModelModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-export const ThreatModelModal: React.FC<ThreatModelModalProps> = ({ isOpen, onClose }) => {
-  if (!isOpen) return null;
+interface ThreatZone {
+  zone: string;
+  Icon: React.ComponentType<{ className?: string }>;
+  threats: string;
+  countermeasures: string;
+  status: string;
+}
 
-  const threatZones = [
-    {
-      zone: '1. Input Surfaces',
-      icon: <Cpu className="h-4 w-4 text-sky-600" />,
-      threats: 'Prompt injection, malicious text inputs, oversized payloads, JSON deserialization bypass.',
-      countermeasures:
-        'Server-side top-level body decoding, payload string sanitization, trimming, and defensive null-safe destructuring with HTTP 400 rejection on invalid shapes.',
-      status: 'Protected',
-    },
-    {
-      zone: '2. Planning & Reasoning',
-      icon: <ShieldAlert className="h-4 w-4 text-amber-600" />,
-      threats: 'System instruction hijacking, persona tampering, jailbreaks, prompt leakage.',
-      countermeasures:
-        'Immutable server-side system instructions segregated from user messages, temperature bounds, and non-executable data encapsulation.',
-      status: 'Protected',
-    },
-    {
-      zone: '3. Tool Execution',
-      icon: <Key className="h-4 w-4 text-purple-600" />,
-      threats: 'API key exfiltration, client-side credential sniffing, SSRF, unauthorized model manipulation.',
-      countermeasures:
-        'Zero-Hardcoding architecture: GEMINI_API_KEY resides strictly server-side behind Express proxy routes with resilient fallback ladders (3.6 Flash -> 3.1 Flash Lite -> Flash Latest -> 3.7 Flash).',
-      status: 'Protected',
-    },
-    {
-      zone: '4. Memory & State',
-      icon: <Database className="h-4 w-4 text-emerald-600" />,
-      threats: 'Cross-user data leakage, unauthorized Firestore reads/writes, session hijacking, undefined payload crashes.',
-      countermeasures:
-        'Owner-bound Cloud Firestore security rules (/users/{userId}/interactions/{id} matching request.auth.uid == userId), strict undefined-stripping serializer, and zero insecure defaults.',
-      status: 'Protected',
-    },
-    {
-      zone: '5. Inter-System Comm.',
-      icon: <EyeOff className="h-4 w-4 text-indigo-600" />,
-      threats: 'Token leakage during auth, replay attacks, man-in-the-middle transmission.',
-      countermeasures:
-        'Firebase Google OAuth popup authentication (no plain passwords handled or stored), HTTPS in-transit encryption, and scoped token isolation.',
-      status: 'Protected',
-    },
-    {
-      zone: '6. Google Maps & Geolocation',
-      icon: <ShieldCheck className="h-4 w-4 text-rose-600" />,
-      threats:
-        'Maps API key exposure/quota theft, SSRF, unauthorized geolocation tracking, malformed/spoofed coordinates injection.',
-      countermeasures:
-        'HTTP referrer domain restriction + API scope lockdown (Maps JS + Places API New); explicit opt-in browser GPS permission prompt; client/server key separation; strict lat/lng numeric bounds validation (-90..90, -180..180) prior to Firestore persistence.',
-      status: 'Protected',
-    },
-    {
-      zone: '7. Admin Role & RBAC (Coach View)',
-      icon: <ShieldAlert className="h-4 w-4 text-indigo-600" />,
-      threats:
-        'Privilege escalation via forged role claims, horizontal data leakage, unauthorized coach entry snooping, missing audit trail.',
-      countermeasures:
-        'Dual-condition Firestore rules check (request.auth.token.admin == true && resource.data.sharedWithCoach == true); opt-in per-entry sharing; server-side custom claim verification; silent /admin route redirection with zero route existence leak; immutable append-only admin_audit_logs.',
-      status: 'Protected',
-    },
-  ];
+const THREAT_ZONES: ThreatZone[] = [
+  {
+    zone: 'Input surfaces',
+    Icon: Cpu,
+    threats:
+      'Prompt injection, malicious text inputs, oversized payloads, JSON deserialization bypass.',
+    countermeasures:
+      'Server-side top-level body decoding, payload string sanitization, trimming, and defensive null-safe destructuring with HTTP 400 rejection on invalid shapes.',
+    status: 'Protected',
+  },
+  {
+    zone: 'Planning & reasoning',
+    Icon: ShieldAlert,
+    threats: 'System instruction hijacking, persona tampering, jailbreaks, prompt leakage.',
+    countermeasures:
+      'Immutable server-side system instructions segregated from user messages, temperature bounds, and non-executable data encapsulation.',
+    status: 'Protected',
+  },
+  {
+    zone: 'Tool execution',
+    Icon: Key,
+    threats:
+      'API key exfiltration, client-side credential sniffing, SSRF, unauthorized model manipulation.',
+    countermeasures:
+      'Zero-hardcoding architecture: GEMINI_API_KEY resides strictly server-side behind Express proxy routes with a resilient fallback ladder (3.6 Flash → 3.1 Flash Lite → Flash Latest → 3.7 Flash).',
+    status: 'Protected',
+  },
+  {
+    zone: 'Memory & state',
+    Icon: Database,
+    threats:
+      'Cross-user data leakage, unauthorized Firestore reads and writes, session hijacking, undefined payload crashes.',
+    countermeasures:
+      'Owner-bound Cloud Firestore rules on /users/{userId}/interactions/{id} matching request.auth.uid == userId, a strict undefined-stripping serializer, and zero insecure defaults.',
+    status: 'Protected',
+  },
+  {
+    zone: 'Inter-system comms',
+    Icon: EyeOff,
+    threats: 'Token leakage during auth, replay attacks, man-in-the-middle transmission.',
+    countermeasures:
+      'Firebase Google OAuth popup authentication with no plain passwords handled or stored, HTTPS in-transit encryption, and scoped token isolation.',
+    status: 'Protected',
+  },
+  {
+    zone: 'Maps & geolocation',
+    Icon: MapPin,
+    threats:
+      'Maps API key exposure and quota theft, SSRF, unauthorized geolocation tracking, malformed or spoofed coordinate injection.',
+    countermeasures:
+      'HTTP referrer domain restriction with API scope lockdown (Maps JS + Places API New), an explicit opt-in browser GPS prompt, client/server key separation, and lat/lng bounds validation (−90..90, −180..180) before persistence.',
+    status: 'Protected',
+  },
+  {
+    zone: 'Admin RBAC (coach view)',
+    Icon: UserCheck,
+    threats:
+      'Privilege escalation via forged role claims, horizontal data leakage, unauthorized coach snooping, missing audit trail.',
+    countermeasures:
+      'Dual-condition Firestore check (request.auth.token.admin == true && resource.data.sharedWithCoach == true), opt-in per-entry sharing, server-side custom claim verification, silent /admin redirection with no route-existence leak, and append-only admin_audit_logs.',
+    status: 'Protected',
+  },
+];
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/60 backdrop-blur-xs p-4 overflow-y-auto">
-      <div className="relative w-full max-w-4xl rounded-2xl bg-white p-6 shadow-2xl border border-stone-200 my-8">
-        <div className="flex items-center justify-between border-b border-stone-200 pb-4">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-800">
-              <ShieldCheck className="h-5 w-5" />
-            </div>
-            <div>
-              <h2 className="text-base font-semibold text-stone-900">
-                Agentic Threat Modeling & Security Review
-              </h2>
-              <p className="text-xs text-stone-500">
-                Mandatory 5-Zone Threat Summary Table & Countermeasures
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="border-b border-stone-200 bg-stone-50 text-stone-700 font-semibold">
-                <th className="py-2.5 px-3">Threat Zone</th>
-                <th className="py-2.5 px-3">Scenario & Threat Vector</th>
-                <th className="py-2.5 px-3">Active Countermeasures & Mitigations</th>
-                <th className="py-2.5 px-3 text-center">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-100 text-stone-600">
-              {threatZones.map((item, idx) => (
-                <tr key={idx} className="hover:bg-stone-50/70 transition-colors">
-                  <td className="py-3 px-3 font-semibold text-stone-900 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      {item.icon}
-                      <span>{item.zone}</span>
-                    </div>
-                  </td>
-                  <td className="py-3 px-3 leading-relaxed max-w-[200px]">{item.threats}</td>
-                  <td className="py-3 px-3 leading-relaxed max-w-[280px]">{item.countermeasures}</td>
-                  <td className="py-3 px-3 text-center">
-                    <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 border border-emerald-200">
-                      {item.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="mt-6 rounded-xl border border-stone-200 bg-stone-50 p-4">
-          <h3 className="text-xs font-semibold text-stone-900 mb-1">
-            Firestore Security Rules Enforced:
-          </h3>
-          <pre className="text-[11px] font-mono bg-stone-900 text-stone-100 p-3 rounded-lg overflow-x-auto">
-{`rules_version = '2';
+const FIRESTORE_RULES = `rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{userId}/interactions/{interactionId} {
+      allow read: if request.auth != null && (
+        request.auth.uid == userId
+        || (request.auth.token.admin == true && resource.data.sharedWithCoach == true)
+      );
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Required for collectionGroup('interactions') queries
+    match /{path=**}/interactions/{interactionId} {
+      allow read: if request.auth != null && (
+        request.auth.uid == resource.data.userId
+        || (request.auth.token.admin == true && resource.data.sharedWithCoach == true)
+      );
+    }
+
+    match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
-  }
-}`}
-          </pre>
-        </div>
 
-        <div className="mt-6 flex justify-end">
-          <button
-            onClick={onClose}
-            className="rounded-xl bg-stone-900 px-4 py-2 text-xs font-semibold text-white hover:bg-stone-800 transition-colors"
-          >
-            Close Threat Review
-          </button>
-        </div>
+    match /admin_audit_logs/{logId} {
+      allow read: if request.auth != null && request.auth.token.admin == true;
+      allow create: if request.auth != null && request.auth.token.admin == true
+        && request.resource.data.adminUid == request.auth.uid;
+      allow update, delete: if false; // Immutable audit trail
+    }
+  }
+}`;
+
+const ZoneIcon: React.FC<{ Icon: ThreatZone['Icon'] }> = ({ Icon }) => (
+  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-subtle text-ink-secondary">
+    <Icon className="h-4 w-4" />
+  </span>
+);
+
+export const ThreatModelModal: React.FC<ThreatModelModalProps> = ({ isOpen, onClose }) => {
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      size="2xl"
+      labelId="threat-model-title"
+      icon={<ShieldCheck className="h-[18px] w-[18px]" aria-hidden="true" />}
+      title={
+        <>
+          Threat model &amp; security{' '}
+          <em className="font-serif font-normal italic">review</em>
+        </>
+      }
+      subtitle={`Where this app can be attacked, and what stops it. ${THREAT_ZONES.length} zones.`}
+      footer={
+        <button type="button" onClick={onClose} className={btnPrimary}>
+          Close review
+        </button>
+      }
+    >
+      {/* Desktop: table. Below md it would overflow, so the same data stacks as cards. */}
+      <div className="hidden md:block">
+        <table className="w-full border-collapse text-left text-ui">
+          <thead>
+            <tr className="border-b border-line">
+              <th scope="col" className={`${sectionLabel} px-3 py-2.5`}>
+                Zone
+              </th>
+              <th scope="col" className={`${sectionLabel} px-3 py-2.5`}>
+                Threat vector
+              </th>
+              <th scope="col" className={`${sectionLabel} px-3 py-2.5`}>
+                Countermeasure
+              </th>
+              <th scope="col" className={`${sectionLabel} px-3 py-2.5 text-right`}>
+                Status
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line-subtle">
+            {THREAT_ZONES.map((item) => (
+              <tr key={item.zone} className="align-top transition-colors duration-150 hover:bg-canvas/70">
+                <td className="px-3 py-4">
+                  <div className="flex items-center gap-2.5">
+                    <ZoneIcon Icon={item.Icon} />
+                    <span className="font-semibold text-ink">{item.zone}</span>
+                  </div>
+                </td>
+                <td className="w-[30%] px-3 py-4 text-ui text-ink-soft">{item.threats}</td>
+                <td className="w-[44%] px-3 py-4 text-ui text-ink-soft">
+                  {item.countermeasures}
+                </td>
+                <td className="px-3 py-4 text-right">
+                  <span className={chipEmerald}>{item.status}</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-    </div>
+
+      <div className="space-y-3 md:hidden">
+        {THREAT_ZONES.map((item) => (
+          <div key={item.zone} className={`${cardQuiet} p-4`}>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <ZoneIcon Icon={item.Icon} />
+                <h3 className="truncate text-ui font-semibold text-ink">{item.zone}</h3>
+              </div>
+              <span className={chipEmerald}>{item.status}</span>
+            </div>
+            <dl className="mt-3 space-y-2.5">
+              <div>
+                <dt className={sectionLabel}>Threat vector</dt>
+                <dd className="mt-1 text-ui text-ink-soft">{item.threats}</dd>
+              </div>
+              <div>
+                <dt className={sectionLabel}>Countermeasure</dt>
+                <dd className="mt-1 text-ui text-ink-soft">
+                  {item.countermeasures}
+                </dd>
+              </div>
+            </dl>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-6">
+        <div className="flex items-center gap-2">
+          <Lock className="h-3.5 w-3.5 text-ink-muted" aria-hidden="true" />
+          <h3 className={sectionLabel}>Firestore rules in force</h3>
+        </div>
+        <pre className="mt-2.5 overflow-x-auto rounded-xl bg-inverse p-4 font-mono text-meta text-on-inverse">
+          {FIRESTORE_RULES}
+        </pre>
+      </div>
+    </Modal>
   );
 };

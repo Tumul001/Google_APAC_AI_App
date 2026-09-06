@@ -288,6 +288,72 @@ In accordance with **Production Directive 10**, the application supports opt-in 
 
 ---
 
+## 8b. Feature 4: Weekly AI Digest (Cloud Scheduler → OIDC → Gemini → Slack)
+
+Every Sunday evening, opted-in users receive one Gemini-written summary of the week they journalled.
+
+- **Off by default, and it needs a destination.** The toggle lives in Settings beside the existing Slack controls. Enabling it requires the user to paste **their own** Slack incoming webhook; the save button stays disabled until they do.
+- **Never the shared channel.** `SLACK_WEBHOOK_URL` is one team webhook. A digest describes a week of private journalling, so it is delivered **only** to the per-user webhook stored at `/users/{uid}.notificationSettings.digestWebhookUrl`. The shared secret is never used as a fallback for a digest — that would publish one person's reflections to everyone.
+- **Not a public endpoint.** `POST /api/digest/weekly` accepts only a Google-signed OIDC token whose `aud` matches `DIGEST_AUDIENCE`, whose issuer is `accounts.google.com`, whose `email_verified` is true, and whose `email` appears in the `DIGEST_INVOKER_SA` allowlist. Anything else gets a bare `401` with no diagnostic detail. If either variable is unset the route **refuses every caller** rather than falling open.
+- **Why in-process verification.** Cloud Run serves the web app and therefore runs `--allow-unauthenticated`, so IAM does not gate this path. The handler reads with the Firebase Admin SDK, which bypasses `firestore.rules` entirely, making this token check the only barrier in front of every user's journal.
+- **Per-user scoping.** One user is read at a time — never a cross-user query or join. Bounded at 200 users per run, 40 entries per user, a 220-character excerpt of each entry's opening message, and a 1,200-character sanitised summary. Full multi-turn threads are never read or sent.
+- **Reuses the hardened path.** Gemini output goes through the same `sanitizeSlackContent` used by per-entry notifications, and the webhook is checked against the `https://hooks.slack.com/services/` origin.
+- **Retry-safe.** `lastDigestSentAt` is written per user; a re-run within six days skips them, so a Cloud Scheduler retry cannot double-send.
+- **Responses carry counts only** — `{processed, sent, skipped, failed}`. No journal content is ever returned or logged.
+
+### Required environment variables
+
+```bash
+DIGEST_AUDIENCE="https://<service>-<hash>-<region>.a.run.app/api/digest/weekly"
+DIGEST_INVOKER_SA="journal-digest-scheduler@$PROJECT_ID.iam.gserviceaccount.com"
+```
+
+### Setting up the Cloud Scheduler job
+
+```bash
+# ── 0. Variables ───────────────────────────────────────────────────────────
+export PROJECT_ID="apac-track2-507117"
+export REGION="asia-south1"                     # run the job near your users
+export SERVICE="gemini-reflections"
+export SA_NAME="journal-digest-scheduler"
+export SA_EMAIL="$SA_NAME@$PROJECT_ID.iam.gserviceaccount.com"
+
+gcloud config set project "$PROJECT_ID"
+gcloud services enable cloudscheduler.googleapis.com run.googleapis.com
+
+# ── 1. A dedicated identity for the job ────────────────────────────────────
+# Its own service account, so the allowlist names exactly one caller and the
+# default compute identity is not reused for a privileged endpoint.
+gcloud iam service-accounts create "$SA_NAME"   --display-name="Weekly journal digest scheduler"
+
+# ── 2. Resolve the deployed URL and tell the service what to trust ─────────
+export SERVICE_URL="$(gcloud run services describe "$SERVICE"   --region "$REGION" --format='value(status.url)')"
+export DIGEST_URL="$SERVICE_URL/api/digest/weekly"
+
+gcloud run services update "$SERVICE"   --region "$REGION"   --update-env-vars "DIGEST_AUDIENCE=$DIGEST_URL,DIGEST_INVOKER_SA=$SA_EMAIL"
+
+# ── 3. Let the job invoke the service ──────────────────────────────────────
+# Harmless if the service is already public; required the moment it is not.
+gcloud run services add-iam-policy-binding "$SERVICE"   --region "$REGION"   --member="serviceAccount:$SA_EMAIL"   --role="roles/run.invoker"
+
+# ── 4. The job: every Sunday at 18:00 IST ──────────────────────────────────
+# --oidc-token-audience must equal DIGEST_AUDIENCE exactly, or the route 401s.
+gcloud scheduler jobs create http weekly-journal-digest   --location="$REGION"   --schedule="0 18 * * SUN"   --time-zone="Asia/Kolkata"   --uri="$DIGEST_URL"   --http-method=POST   --headers="Content-Type=application/json"   --message-body='{}'   --oidc-service-account-email="$SA_EMAIL"   --oidc-token-audience="$DIGEST_URL"   --attempt-deadline=540s   --max-retry-attempts=3   --min-backoff=60s
+
+# ── 5. Grant the runtime service account Firestore read/write ──────────────
+# The digest reads across users with the Admin SDK and writes lastDigestSentAt.
+export RUNTIME_SA="$(gcloud run services describe "$SERVICE"   --region "$REGION" --format='value(spec.template.spec.serviceAccountName)')"
+gcloud projects add-iam-policy-binding "$PROJECT_ID"   --member="serviceAccount:${RUNTIME_SA:-$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')-compute@developer.gserviceaccount.com}"   --role="roles/datastore.user"
+
+# ── 6. Fire it once now to confirm the whole chain ─────────────────────────
+gcloud scheduler jobs run weekly-journal-digest --location="$REGION"
+gcloud beta run services logs read "$SERVICE" --region "$REGION" --limit=20 | grep Digest
+```
+
+Expect `[Digest] Run started by journal-digest-scheduler@… : N opted-in user(s).` A `401` means `--oidc-token-audience` and `DIGEST_AUDIENCE` disagree, or the caller is missing from `DIGEST_INVOKER_SA`.
+
+---
+
 ## 9. Security Remediation: Environment Template & Repository Hygiene
 
 ### Problem Statement & Threat Vector

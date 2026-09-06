@@ -15,8 +15,15 @@ import {
   Share2,
 } from 'lucide-react';
 import type { JournalEntry, UserProfile } from '../types';
-import { subscribeToSharedCoachEntries, logAdminEntryView, forceRefreshToken } from '../lib/firebase';
+import { forceRefreshToken } from '../lib/firebase';
+import {
+  subscribeToSharedCoachEntries,
+  logAdminEntryView,
+} from '../lib/firestore';
 import { LocationPreview } from './LocationPreview';
+import { btnPrimary, btnSecondary, card, chip, field, sectionLabel } from '../lib/ui';
+import { debug } from '../lib/debug';
+import { formatFullDate, formatListDate, formatTime } from '../lib/datetime';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -51,13 +58,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
 
       // Force refresh token on mount so Firestore SDK stream carries the latest claims
       try {
-        console.log('[AdminDashboard] Requesting forceRefreshToken() on mount before Firestore collectionGroup query...');
         const result = await forceRefreshToken();
-        console.log('[AdminDashboard] Decoded token claims right before access check:', {
-          claims: result.claims,
-          'claims.admin': result.claims.admin,
-          isAdmin: result.isAdmin,
-        });
+        debug('[Admin] claims before access check', { isAdmin: result.isAdmin });
         if (!isCancelled) {
           setDecodedClaims(result.claims);
         }
@@ -100,9 +102,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
   const handleForceRefreshAndRetry = async () => {
     setIsRefreshing(true);
     try {
-      console.log('[AdminDashboard] Manual token refresh triggered by user...');
       const result = await forceRefreshToken();
-      console.log('[AdminDashboard] Manual refresh result claims:', result.claims);
+      debug('[Admin] manual refresh', { isAdmin: result.isAdmin });
       setDecodedClaims(result.claims);
       setRetryKey((k) => k + 1);
     } catch (e) {
@@ -138,7 +139,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
       return `User (${entry.authorInitial})`;
     }
     if (entry.userId) {
-      // Derive a consistent anonymous client code: e.g. "Client #A8F"
+      // Derive a consistent anonymous client code: e.g."Client #A8F"
       const hash = entry.userId.slice(-4).toUpperCase();
       return `Client #${hash}`;
     }
@@ -156,30 +157,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
   });
 
   return (
-    <main className="flex-1 flex flex-col bg-stone-100/70 overflow-hidden">
+    <main id="main-content" className="flex-1 flex flex-col bg-subtle/70 overflow-hidden">
       {/* Top Banner: Coach / Admin Scope Notice */}
-      <div className="border-b border-stone-200/80 bg-stone-50/90 px-4 py-3 sm:px-6 backdrop-blur-md">
+      <div className="border-b border-line bg-canvas px-4 py-3 sm:px-6">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 text-stone-800 shrink-0" />
-            <span className="text-xs font-semibold text-stone-900 font-sans">
-              Coach Review Workspace (Role-Based Access Control)
-            </span>
-            <span className="hidden md:inline-flex items-center rounded-full bg-stone-200/80 px-2 py-0.5 text-[10px] font-medium text-stone-700 font-mono">
-              admin: true verified
+            <ShieldCheck className="h-4 w-4 text-ink-body shrink-0" />
+            <h1 className="text-ui font-semibold text-ink">Coach review workspace</h1>
+            <span className="hidden md:block">
+              <span className={`${chip} font-mono`} translate="no">
+                admin: true
+              </span>
             </span>
           </div>
 
-          <div className="flex items-center gap-3 text-xs">
-            <span className="text-stone-500 text-[11px] hidden sm:inline">
-              Only entries explicitly marked <strong className="font-semibold text-stone-800">"Share with Coach"</strong> are visible here.
+          <div className="flex items-center gap-3 text-meta">
+            <span className="hidden text-meta text-ink-muted sm:inline">
+              Only entries a user marked <strong className="font-semibold text-ink-body">&ldquo;Share with coach&rdquo;</strong> appear here.
             </span>
             <button
               onClick={onNavigateHome}
-              className="flex items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 shadow-2xs hover:bg-stone-50 transition-colors cursor-pointer"
+              className={btnSecondary}
             >
-              <ArrowLeft className="h-3 w-3" />
-              <span>Back to Journal</span>
+              <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>Back to journal</span>
             </button>
           </div>
         </div>
@@ -187,26 +188,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
 
       {accessError ? (
         <div className="flex flex-1 items-center justify-center p-6">
-          <div className="max-w-xl w-full rounded-2xl border border-stone-200 bg-white p-6 text-center shadow-xs">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-stone-100 text-stone-700 mb-3 border border-stone-200">
+          <div className="max-w-xl w-full rounded-2xl border border-line bg-surface p-6 text-center shadow-xs">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-subtle text-ink-secondary mb-3 border border-line">
               <Lock className="h-5 w-5" />
             </div>
-            <h3 className="text-base font-semibold text-stone-900 font-serif">Access Restricted</h3>
-            <p className="mt-1.5 text-xs text-stone-600 leading-relaxed font-mono bg-stone-50 p-2.5 rounded-lg border border-stone-200 text-left overflow-x-auto break-all">
+            <h2 className="text-body font-semibold text-ink">
+              Access <em className="font-serif font-normal italic">restricted</em>
+            </h2>
+            <p className="mt-1.5 overflow-x-auto break-all rounded-lg border border-line bg-canvas p-2.5 text-left font-mono text-meta text-ink-secondary">
               {accessError}
             </p>
             {firestoreErrorCode && (
-              <p className="mt-1.5 text-[11px] text-red-600 font-mono text-left">
+              <p className="mt-1.5 text-left font-mono text-meta text-red-700">
                 Firestore Error Code: {firestoreErrorCode}
               </p>
             )}
 
             {/* Diagnostic Token Claims Display */}
-            <div className="mt-3 text-left rounded-xl bg-stone-50 border border-stone-200 p-3">
+            <div className="mt-3 text-left rounded-xl bg-canvas border border-line p-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-stone-800">Decoded Token Claims</span>
-                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                  decodedClaims?.admin ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                <span className="text-meta font-semibold text-ink-body">Your sign-in claims</span>
+                <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-meta font-semibold ${
+                  decodedClaims?.admin ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-amber-50 text-amber-800 border border-amber-200'
                 }`}>
                   admin claim: {decodedClaims?.admin ? 'true (Present)' : 'missing / false'}
                 </span>
@@ -214,12 +217,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
               <button
                 type="button"
                 onClick={() => setShowDiagnostics((prev) => !prev)}
-                className="mt-1 text-[11px] text-stone-600 hover:text-stone-900 hover:underline cursor-pointer"
+                className="mt-1 cursor-pointer text-meta text-ink-soft underline underline-offset-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
               >
                 {showDiagnostics ? 'Hide raw claims JSON' : 'Show raw claims JSON'}
               </button>
               {showDiagnostics && (
-                <pre className="mt-2 text-[10px] text-stone-600 bg-white p-2 rounded-lg border border-stone-200 overflow-x-auto max-h-36 font-mono">
+                <pre className="mt-2 max-h-36 overflow-x-auto rounded-lg border border-line bg-surface p-2 font-mono text-meta text-ink-secondary">
                   {decodedClaims ? JSON.stringify(decodedClaims, null, 2) : 'No token claims received yet'}
                 </pre>
               )}
@@ -230,16 +233,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
                 id="refresh-admin-token-btn"
                 onClick={handleForceRefreshAndRetry}
                 disabled={isRefreshing}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3.5 py-2 text-xs font-medium text-stone-700 shadow-2xs hover:bg-stone-50 transition-colors disabled:opacity-50 cursor-pointer"
+                className={btnSecondary}
               >
-                <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin text-stone-600' : ''}`} />
-                <span>{isRefreshing ? 'Refreshing Token...' : 'Refresh Token & Retry'}</span>
+                <RefreshCw
+                  className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin text-ink-soft motion-reduce:animate-none' : ''}`}
+                  aria-hidden="true"
+                />
+                <span>{isRefreshing ? 'Refreshing token…' : 'Refresh token & retry'}</span>
               </button>
               <button
                 onClick={onNavigateHome}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-stone-900 px-4 py-2 text-xs font-medium text-white shadow-2xs hover:bg-stone-800 transition-colors cursor-pointer"
+                className={btnPrimary}
               >
-                <ArrowLeft className="h-3.5 w-3.5" /> Return to My Journal
+                <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" /> Return to my journal
               </button>
             </div>
           </div>
@@ -247,17 +253,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
       ) : (
         <div className="flex-1 flex flex-col md:flex-row overflow-hidden max-w-7xl mx-auto w-full p-3 sm:p-5 gap-4">
           {/* Left Column: Shared Entries Directory */}
-          <div className="w-full md:w-80 lg:w-96 flex flex-col rounded-2xl border border-stone-200/80 bg-white shadow-xs overflow-hidden">
-            <div className="p-3.5 border-b border-stone-200/70 bg-stone-50/50">
+          <div className={`${card} flex w-full flex-col overflow-hidden md:w-80 lg:w-96`}>
+            <div className="p-3.5 border-b border-line/70 bg-canvas/50">
               <div className="flex items-center justify-between gap-2 mb-2">
                 <div className="flex items-center gap-2">
-                  <Share2 className="h-4 w-4 text-stone-700" />
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-700 font-sans">
-                    Shared Entries ({filteredEntries.length})
-                  </h3>
+                  <Share2 className="h-4 w-4 text-ink-secondary" />
+                  <h3 className={sectionLabel}>Shared entries ({filteredEntries.length})</h3>
                 </div>
                 {auditLogStatus && (
-                  <span className="text-[10px] text-emerald-700 animate-pulse font-medium">
+                  <span role="status" aria-live="polite" className="text-meta font-medium text-emerald-700">
                     {auditLogStatus}
                   </span>
                 )}
@@ -265,14 +269,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
 
               {/* Search Bar */}
               <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-stone-400" />
+                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-ink-faint" />
                 <input
                   id="coach-search-input"
                   type="text"
-                  placeholder="Filter shared reflections..."
+                  placeholder="Filter shared reflections…"
+                  aria-label="Filter shared reflections"
+                  autoComplete="off"
+                  spellCheck={false}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-lg border border-stone-200 bg-white pl-8 pr-3 py-1.5 text-xs text-stone-900 placeholder:text-stone-400 focus:border-stone-400 focus:outline-hidden"
+                  className={`${field} pl-9`}
                 />
               </div>
             </div>
@@ -280,15 +287,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
             {/* Entries List */}
             <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
               {isLoading ? (
-                <div className="flex flex-col items-center justify-center p-8 text-stone-400 gap-2">
-                  <RefreshCw className="h-5 w-5 animate-spin text-stone-400" />
-                  <p className="text-xs">Loading shared client reflections...</p>
+                <div className="flex flex-col items-center justify-center p-8 text-ink-faint gap-2">
+                  <RefreshCw className="h-5 w-5 animate-spin text-ink-faint motion-reduce:animate-none" aria-hidden="true" />
+                  <p className="text-meta">Loading shared reflections…</p>
                 </div>
               ) : filteredEntries.length === 0 ? (
-                <div className="p-6 text-center text-stone-500">
-                  <p className="text-xs font-semibold text-stone-700">No shared reflections found</p>
-                  <p className="text-[11px] text-stone-400 mt-1">
-                    Users can toggle "Share with Coach" on any entry they wish to discuss.
+                <div className="p-6 text-center text-ink-muted">
+                  <p className="text-ui font-semibold text-ink-secondary">Nothing shared with you yet</p>
+                  <p className="mt-1 text-meta text-ink-muted">
+                    An entry appears here once its writer turns on &ldquo;Share with coach&rdquo; for it.
                   </p>
                 </div>
               ) : (
@@ -301,38 +308,46 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
                     <div
                       key={entry.id}
                       id={`coach-entry-item-${entry.id}`}
-                      onClick={() => handleSelectEntry(entry)}
-                      className={`group rounded-xl p-3 text-left transition-all cursor-pointer border ${
+                      className={`group relative rounded-xl border p-3 text-left transition-[background-color,border-color] duration-150 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink motion-reduce:transition-none ${
                         isSelected
-                          ? 'border-stone-900/40 bg-stone-100/90 shadow-2xs'
-                          : 'border-stone-200/70 hover:border-stone-300 hover:bg-stone-50/80 bg-white'
+                          ? 'border-inverse/40 bg-subtle/90 shadow-2xs'
+                          : 'border-line/70 hover:border-line-strong hover:bg-canvas/80 bg-surface'
                       }`}
                     >
                       <div className="flex items-center justify-between gap-1 mb-1">
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-stone-700 bg-stone-100 border border-stone-200/70 px-1.5 py-0.5 rounded">
-                          <UserCheck className="h-2.5 w-2.5 text-stone-600" />
+                        <span className={chip}>
+                          <UserCheck className="h-2.5 w-2.5 text-ink-soft" aria-hidden="true" />
                           {anonymizedUser}
                         </span>
-                        <span className="text-[10px] text-stone-400 font-sans">
-                          {new Date(entry.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                        <span className="text-meta text-ink-muted">
+                          {formatListDate(entry.updatedAt)}
                         </span>
                       </div>
 
-                      <h4 className="text-xs font-semibold text-stone-900 truncate font-sans">
-                        {entry.title || 'Untitled Reflection'}
+                      <h4 className="min-w-0 truncate text-ui font-semibold text-ink">
+                        <button
+                          type="button"
+                          onClick={() => handleSelectEntry(entry)}
+                          aria-current={isSelected ? 'true' : undefined}
+                          className="block max-w-full cursor-pointer truncate text-left after:absolute after:inset-0 after:rounded-xl after:content-[''] focus:outline-none"
+                        >
+                          {entry.title || 'Untitled reflection'}
+                        </button>
                       </h4>
 
                       {entry.messages && entry.messages.length > 0 && (
-                        <p className="text-[11px] text-stone-500 line-clamp-2 mt-1 leading-relaxed">
+                        <p className="mt-1 line-clamp-2 text-meta text-ink-muted">
                           {entry.messages[entry.messages.length - 1].content}
                         </p>
                       )}
 
-                      <div className="flex items-center justify-between mt-2 pt-1 border-t border-stone-100 text-[10px] text-stone-400">
-                        <span className="capitalize font-medium text-stone-600">{entry.mode}</span>
+                      <div className="mt-2 flex items-center justify-between border-t border-line-subtle pt-1.5 text-meta text-ink-muted">
+                        <span className="font-medium capitalize text-ink-soft">
+                          {entry.mode.replace('_', ' ')}
+                        </span>
                         <div className="flex items-center gap-2">
                           {entry.location && (
-                            <span className="flex items-center gap-0.5 text-stone-600">
+                            <span className="flex items-center gap-0.5 text-ink-soft">
                               <MapPin className="h-2.5 w-2.5" />
                               Tagged
                             </span>
@@ -348,44 +363,41 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
           </div>
 
           {/* Right Column: Detailed Read-Only Viewer */}
-          <div className="flex-1 flex flex-col rounded-2xl border border-stone-200/80 bg-white shadow-xs overflow-hidden">
+          <div className={`${card} flex flex-1 flex-col overflow-hidden`}>
             {selectedEntry ? (
               <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Viewer Header */}
-                <div className="border-b border-stone-200 p-4 sm:px-6 flex items-start justify-between gap-3 bg-stone-50/50">
+                <div className="border-b border-line p-4 sm:px-6 flex items-start justify-between gap-3 bg-canvas/50">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 border border-stone-200 px-2.5 py-0.5 text-xs font-semibold text-stone-800">
-                        <UserCheck className="h-3 w-3 text-stone-600" />
+                      <span className={chip} title="Identity is withheld unless the writer shares it">
+                        <UserCheck className="h-3 w-3 text-ink-soft" aria-hidden="true" />
                         {getAnonymizedLabel(selectedEntry)}
                       </span>
-                      <span className="text-xs text-stone-400 font-mono">
-                        (Anonymized Client ID)
-                      </span>
                     </div>
-                    <h2 className="text-lg sm:text-xl font-semibold text-stone-900 truncate font-serif tracking-tight">
+                    <h2 className="text-title sm:text-xl font-semibold text-ink truncate font-serif tracking-tight">
                       {selectedEntry.title}
                     </h2>
-                    <div className="flex items-center gap-2 text-xs text-stone-400 mt-1 font-sans">
+                    <div className="mt-1 flex items-center gap-2 text-meta text-ink-muted">
                       <Calendar className="h-3.5 w-3.5" />
-                      <span>{new Date(selectedEntry.createdAt).toLocaleString()}</span>
+                      <span>{formatFullDate(selectedEntry.createdAt)}</span>
                       <span>•</span>
-                      <span className="capitalize font-medium text-stone-600">
-                        Mode: {selectedEntry.mode}
+                      <span className="font-medium capitalize text-ink-soft">
+                        {selectedEntry.mode.replace('_', ' ')}
                       </span>
                     </div>
                   </div>
 
                   <div className="shrink-0 flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1 text-[11px] text-stone-600 bg-stone-100 px-2.5 py-1 rounded-lg border border-stone-200">
-                      <Eye className="h-3 w-3 text-stone-400" />
-                      Read-Only View
+                    <span className={chip}>
+                      <Eye className="h-3 w-3 text-ink-muted" aria-hidden="true" />
+                      Read only
                     </span>
                   </div>
                 </div>
 
                 {/* Viewer Content Stream */}
-                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6"><div className="mx-auto max-w-[62ch] space-y-4">
                   {/* Location Preview if tagged */}
                   {selectedEntry.location && (
                     <LocationPreview location={selectedEntry.location} variant="editor" />
@@ -393,12 +405,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
 
                   {/* AI Summary Highlight */}
                   {selectedEntry.summary && (
-                    <div className="rounded-xl border border-stone-200 bg-stone-50/70 p-4">
-                      <div className="flex items-center gap-2 text-stone-900 font-serif font-semibold text-sm mb-1.5">
+                    <div className="rounded-xl border border-line bg-canvas/70 p-4">
+                      <div className="flex items-center gap-2 text-ink font-serif font-semibold text-ui mb-1.5">
                         <Sparkles className="h-4 w-4 text-amber-600" />
                         AI Summary & Takeaways
                       </div>
-                      <div className="text-xs text-stone-700 prose prose-stone max-w-none leading-relaxed">
+                      <div className="markdown-body max-w-none text-ui text-ink-secondary">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
                           {selectedEntry.summary}
                         </ReactMarkdown>
@@ -408,29 +420,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
 
                   {/* Messages Conversation Stream */}
                   <div className="space-y-3">
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-stone-500 font-sans">
-                      Conversation History ({selectedEntry.messages?.length || 0})
+                    <h4 className={sectionLabel}>
+                      Conversation ({selectedEntry.messages?.length || 0})
                     </h4>
 
                     {selectedEntry.messages && selectedEntry.messages.length > 0 ? (
                       selectedEntry.messages.map((msg) => (
                         <div
                           key={msg.id}
-                          className={`rounded-xl p-3.5 text-xs ${
+                          className={`rounded-xl p-3.5 text-ui ${
                             msg.role === 'user'
-                              ? 'bg-stone-100 border border-stone-200/80 text-stone-900 ml-4'
-                              : 'bg-stone-50 border border-stone-200 text-stone-800 mr-4'
+                              ? 'ml-4 border border-line/80 bg-subtle text-ink'
+                              : 'mr-4 border border-line bg-canvas text-ink-body'
                           }`}
                         >
                           <div className="flex items-center justify-between gap-2 mb-1.5">
-                            <span className="font-semibold capitalize text-stone-800 text-[11px] font-sans">
-                              {msg.role === 'user' ? 'Client Reflection' : 'AI Companion Response'}
+                            <span className="text-meta font-semibold capitalize text-ink-body">
+                              {msg.role === 'user' ? 'Client' : 'Gemini'}
                             </span>
-                            <span className="text-[10px] text-stone-400">
-                              {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            <span className="text-meta tabular-nums text-ink-muted">
+                              {formatTime(msg.timestamp)}
                             </span>
                           </div>
-                          <div className="prose prose-stone text-xs max-w-none leading-relaxed font-sans">
+                          <div className="markdown-body max-w-none text-ui">
                             <ReactMarkdown remarkPlugins={[remarkGfm]}>
                               {msg.content}
                             </ReactMarkdown>
@@ -438,25 +450,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
                         </div>
                       ))
                     ) : (
-                      <p className="text-xs text-stone-400 italic">No messages in this reflection entry.</p>
+                      <p className="text-meta text-ink-faint italic">No messages in this reflection entry.</p>
                     )}
                   </div>
                 </div>
 
+                </div>
+
                 {/* Audit Trail Guarantee Notice */}
-                <div className="border-t border-stone-200 bg-stone-50 px-4 py-2.5 text-[11px] text-stone-500 flex items-center justify-between">
+                <div className="flex items-center justify-between border-t border-line bg-canvas px-4 py-2.5 text-meta text-ink-muted">
                   <span className="flex items-center gap-1.5">
                     <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-                    Access to this document is recorded in <code className="text-[10px] font-mono bg-stone-200/70 px-1 py-0.5 rounded">admin_audit_logs</code>
+                    Every time a coach opens an entry it is recorded in <code className="rounded bg-muted-surface/70 px-1 py-0.5 font-mono text-meta" translate="no">admin_audit_logs</code>
                   </span>
-                  <span className="text-stone-400">Confidential Client Record</span>
+                  <span className="text-ink-faint">Shared in confidence</span>
                 </div>
               </div>
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-stone-400">
-                <Eye className="h-10 w-10 stroke-1 text-stone-300 mb-2" />
-                <p className="text-sm font-medium text-stone-600 font-serif">No Reflection Selected</p>
-                <p className="text-xs text-stone-400 max-w-xs mt-1">
+              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-ink-faint">
+                <Eye className="h-10 w-10 stroke-1 text-ink-ghost mb-2" />
+                <p className="text-ui font-medium text-ink-soft font-serif">No Reflection Selected</p>
+                <p className="mt-1 max-w-xs text-meta text-ink-muted">
                   Choose a shared entry from the list on the left to inspect the client reflection and location details.
                 </p>
               </div>

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  X,
   Bell,
   Check,
   ShieldCheck,
@@ -10,13 +9,20 @@ import {
   CheckCheck,
   Sliders,
   ExternalLink,
+  Heart,
+  Sparkles,
+  Lightbulb,
+  MessageSquare,
 } from 'lucide-react';
 import type { NotificationSettings, JournalMode, UserProfile } from '../types';
+import { Modal } from './Modal';
+import { btnPrimary, btnSecondary, card, cardQuiet, field, sectionLabel } from '../lib/ui';
 import {
+  DEFAULT_NOTIFICATION_SETTINGS,
   getUserNotificationSettings,
   saveUserNotificationSettings,
   testSlackWebhook,
-} from '../lib/firebase';
+} from '../lib/firestore';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -25,30 +31,35 @@ interface SettingsModalProps {
   onSettingsSaved?: (newSettings: NotificationSettings) => void;
 }
 
-const AVAILABLE_MODES: { id: JournalMode; label: string; icon: string; description: string }[] = [
+const AVAILABLE_MODES: {
+  id: JournalMode;
+  label: string;
+  Icon: React.ComponentType<{ className?: string }>;
+  description: string;
+}[] = [
   {
     id: 'gratitude',
     label: 'Gratitude',
-    icon: '🌿',
-    description: 'Entries focused on daily appreciation and positive reflection.',
+    Icon: Heart,
+    description: 'Noticing what went right, and who was behind it.',
   },
   {
     id: 'deep_thinking',
     label: 'Deep Thinking',
-    icon: '🧠',
-    description: 'In-depth philosophical inquiries and complex contemplation.',
+    Icon: Sparkles,
+    description: 'Testing an assumption, or arguing the other side.',
   },
   {
     id: 'brainstorm',
     label: 'Brainstorming',
-    icon: '💡',
-    description: 'Creative ideation sessions, problem-solving, and plans.',
+    Icon: Lightbulb,
+    description: 'Working a problem until there are real options.',
   },
   {
     id: 'reflection',
     label: 'Daily Reflection',
-    icon: '🪞',
-    description: 'Standard day-to-day mindfulness and open reflections.',
+    Icon: MessageSquare,
+    description: 'Whatever today left you with.',
   },
 ];
 
@@ -58,10 +69,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   user,
   onSettingsSaved,
 }) => {
-  const [settings, setSettings] = useState<NotificationSettings>({
-    slackEnabled: false,
-    slackTriggerModes: ['gratitude', 'deep_thinking'],
-  });
+  const [settings, setSettings] = useState<NotificationSettings>(DEFAULT_NOTIFICATION_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -121,7 +129,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     });
   };
 
+  const digestWebhook = settings.digestWebhookUrl?.trim() || '';
+  const digestWebhookLooksValid =
+    digestWebhook.startsWith('https://hooks.slack.com/services/') && digestWebhook.length > 40;
+  // Enabling the digest without a destination would silently do nothing every
+  // Sunday, so the save is blocked until there is one.
+  const digestBlocked = settings.weeklyDigestEnabled && !digestWebhookLooksValid;
+
   const handleSave = async () => {
+    if (digestBlocked) return;
     setIsSaving(true);
     setSaveSuccess(false);
     try {
@@ -173,53 +189,85 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl border border-stone-200 bg-white shadow-2xl overflow-hidden">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-stone-200 bg-stone-50/70 px-6 py-4">
-          <div className="flex items-center space-x-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-stone-900 text-white shadow-xs">
-              <Sliders className="h-4 w-4" />
-            </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-semibold text-stone-900 font-serif tracking-tight">Notification & Integration Settings</h2>
-              <p className="text-xs text-stone-500 font-sans">Configure opt-in triggers and external notifications</p>
-            </div>
-          </div>
-          <button
-            id="close-settings-modal-btn"
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-200/60 hover:text-stone-700 transition-colors cursor-pointer"
-          >
-            <X className="h-5 w-5" />
-          </button>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      size="lg"
+      labelId="settings-modal-title"
+      icon={<Sliders className="h-[18px] w-[18px]" aria-hidden="true" />}
+      title={
+        <>
+          Notifications &amp; <em className="font-serif font-normal italic">integrations</em>
+        </>
+      }
+      subtitle="Choose which entries reach Slack. Off by default."
+      footer={
+        <div className="flex w-full items-center justify-between gap-3">
+          <span aria-live="polite" className="min-w-0 text-ui">
+            {saveSuccess && (
+              <span className="inline-flex items-center gap-1.5 font-medium text-emerald-700">
+                <Check className="h-4 w-4 text-emerald-600" aria-hidden="true" />
+                Preferences saved
+              </span>
+            )}
+          </span>
+          <span className="flex shrink-0 items-center gap-2.5">
+            <button id="cancel-settings-btn" type="button" onClick={onClose} className={btnSecondary}>
+              Close
+            </button>
+            <button
+              id="save-settings-btn"
+              type="button"
+              onClick={handleSave}
+              disabled={isSaving || isLoading || digestBlocked}
+              className={btnPrimary}
+            >
+              {isSaving ? (
+                <>
+                  <span
+                    className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent motion-reduce:animate-none"
+                    aria-hidden="true"
+                  />
+                  <span>Saving…</span>
+                </>
+              ) : (
+                <>
+                  <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>Save preferences</span>
+                </>
+              )}
+            </button>
+          </span>
         </div>
-
-        {/* Modal Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      }
+    >
+      <div className="space-y-6">
           {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-12 text-stone-500 space-y-3">
-              <div className="h-7 w-7 animate-spin rounded-full border-2 border-stone-800 border-t-transparent" />
-              <p className="text-xs font-sans">Loading preferences...</p>
+            <div className="flex flex-col items-center justify-center py-12 text-ink-muted space-y-3">
+              <div
+                className="h-7 w-7 animate-spin rounded-full border-2 border-ink-body border-t-transparent motion-reduce:animate-none motion-reduce:border-t-stone-300"
+                aria-hidden="true"
+              />
+              <p className="text-meta">Loading preferences…</p>
             </div>
           ) : (
             <>
               {/* Slack Webhook Section */}
-              <div className="rounded-xl border border-stone-200 bg-white p-5 shadow-2xs space-y-5">
+              <div className={`${card} space-y-5 p-5`}>
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start space-x-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-700 border border-stone-200 mt-0.5">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-subtle text-ink-secondary border border-line mt-0.5">
                       <Bell className="h-5 w-5" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-semibold text-stone-900 font-sans">Slack Webhook Notifications</h3>
-                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-stone-100 text-stone-700 border border-stone-200 font-mono">
-                          Opt-in Only
+                        <h3 className="text-ui font-semibold text-ink">Post to Slack when you save</h3>
+                        <span className="inline-flex items-center rounded-md border border-line bg-subtle px-2 py-0.5 font-mono text-meta font-semibold text-ink-secondary">
+                          Off by default
                         </span>
                       </div>
-                      <p className="mt-1 text-xs text-stone-600 leading-relaxed font-sans">
-                        Trigger an incoming notification to your team's Slack channel whenever a journal entry matching selected modes is successfully saved.
+                      <p className="mt-1 max-w-[62ch] text-ui text-ink-soft">
+                        Post a note to your Slack channel when you save an entry in one of the modes you pick below.
                       </p>
                     </div>
                   </div>
@@ -235,57 +283,63 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       }
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-stone-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-stone-900"></div>
+                    <div className="peer h-6 w-11 rounded-full bg-muted-surface after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-line-strong after:bg-surface after:transition-transform after:duration-150 after:content-[''] peer-checked:bg-inverse peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ink motion-reduce:after:transition-none"></div>
                   </label>
                 </div>
 
                 {/* Privacy & Sanitization Callout */}
-                <div className="flex items-start gap-2.5 rounded-xl bg-stone-50 border border-stone-200/80 p-3 text-xs text-stone-700">
+                <div className="flex items-start gap-2.5 rounded-xl bg-canvas border border-line/80 p-3 text-meta text-ink-secondary">
                   <ShieldCheck className="h-4 w-4 text-emerald-700 shrink-0 mt-0.5" />
-                  <p className="leading-relaxed font-sans">
-                    <strong className="font-semibold text-stone-900">Zero Private Content Leakage:</strong> Per security directives, notifications transmit only the entry title and a sanitized excerpt (~200 characters max, Slack markdown-escaped). Full private reflections and multi-turn threads are never transmitted.
+                  <p className="max-w-[62ch] text-ui">
+                    <strong className="font-semibold text-ink">What Slack receives:</strong> the entry title and about 200 characters of it, with Slack formatting escaped. The rest of the entry, and every reply in the thread, stays here.
                   </p>
                 </div>
 
                 {/* Trigger Modes Selector (Enabled state) */}
                 {settings.slackEnabled && (
-                  <div className="pt-2 border-t border-stone-100 space-y-3">
+                  <div className="pt-2 border-t border-line-subtle space-y-3">
                     <div>
-                      <h4 className="text-xs font-semibold text-stone-800 font-sans">Trigger Modes</h4>
-                      <p className="text-[11px] text-stone-500 font-sans">
-                        Select which entry types dispatch a Slack alert upon saving:
+                      <h4 className={sectionLabel}>Trigger modes</h4>
+                      <p className="text-ui text-ink-muted">
+                        Which modes should post to Slack:
                       </p>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                      {AVAILABLE_MODES.map((mode) => {
+                      {AVAILABLE_MODES.map(({ Icon, ...mode }) => {
                         const isChecked = settings.slackTriggerModes.includes(mode.id);
                         return (
                           <button
                             key={mode.id}
                             type="button"
                             onClick={() => handleToggleMode(mode.id)}
-                            className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                            className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-left transition-[background-color,border-color,box-shadow] duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink motion-reduce:transition-none ${
                               isChecked
-                                ? 'border-stone-900 bg-stone-50/80 ring-1 ring-stone-900/10'
-                                : 'border-stone-200 bg-white hover:border-stone-300'
+                                ? 'border-inverse bg-canvas/80 ring-1 ring-ink/10'
+                                : 'border-line bg-surface hover:border-line-strong'
                             }`}
                           >
-                            <div className="text-lg shrink-0 mt-0.5">{mode.icon}</div>
+                            <span
+                              className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
+                                isChecked ? 'bg-inverse text-on-inverse' : 'bg-subtle text-ink-soft'
+                              }`}
+                            >
+                              <Icon className="h-3.5 w-3.5" />
+                            </span>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between">
-                                <span className="text-xs font-semibold text-stone-900 font-sans">{mode.label}</span>
+                                <span className="text-meta font-semibold text-ink">{mode.label}</span>
                                 <div
                                   className={`h-4 w-4 rounded flex items-center justify-center border transition-colors ${
                                     isChecked
-                                      ? 'bg-stone-900 border-stone-900 text-white'
-                                      : 'border-stone-300 bg-white'
+                                      ? 'bg-inverse border-inverse text-surface'
+                                      : 'border-line-strong bg-surface'
                                   }`}
                                 >
                                   {isChecked && <Check className="h-3 w-3" />}
                                 </div>
                               </div>
-                              <p className="mt-0.5 text-[11px] text-stone-500 line-clamp-2 font-sans">
+                              <p className="mt-0.5 text-ui text-ink-muted line-clamp-2">
                                 {mode.description}
                               </p>
                             </div>
@@ -295,7 +349,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
 
                     {settings.slackTriggerModes.length === 0 && (
-                      <p className="text-[11px] text-amber-600 flex items-center gap-1.5 pt-1">
+                      <p className="text-meta text-amber-600 flex items-center gap-1.5 pt-1">
                         <AlertCircle className="h-3.5 w-3.5" />
                         Please select at least one trigger mode to receive notifications.
                       </p>
@@ -304,21 +358,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 )}
 
                 {/* Server Webhook Status & Secret Manager Connectivity */}
-                <div className="pt-2 border-t border-stone-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 font-sans">
-                    <span className="text-xs text-stone-600 font-medium">Server Secret Status:</span>
+                <div className="pt-2 border-t border-line-subtle flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-meta text-ink-soft font-medium">Webhook configured on the server:</span>
                     {serverHasSlackSecret === true ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800">
+                      <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-meta font-semibold text-emerald-800">
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
                         SLACK_WEBHOOK_URL Configured
                       </span>
                     ) : serverHasSlackSecret === false ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800">
+                      <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-meta font-semibold text-amber-800">
                         <span className="h-1.5 w-1.5 rounded-full bg-amber-600" />
                         Pending in Secret Manager
                       </span>
                     ) : (
-                      <span className="text-xs text-stone-400">Checking...</span>
+                      <span className="text-meta text-ink-faint">Checking...</span>
                     )}
                   </div>
 
@@ -327,17 +381,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     type="button"
                     onClick={handleTestNotification}
                     disabled={isTestingWebhook}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 shadow-2xs hover:bg-stone-50 transition-colors disabled:opacity-50 cursor-pointer"
+                    className={btnSecondary}
                   >
-                    <Send className={`h-3 w-3 ${isTestingWebhook ? 'animate-pulse text-stone-600' : 'text-stone-500'}`} />
-                    <span>{isTestingWebhook ? 'Sending Ping...' : 'Test Slack Ping'}</span>
+                    <Send
+                      className={`h-3.5 w-3.5 ${isTestingWebhook ? 'animate-pulse text-ink-soft motion-reduce:animate-none' : 'text-ink-muted'}`}
+                      aria-hidden="true"
+                    />
+                    <span>{isTestingWebhook ? 'Sending ping…' : 'Send test ping'}</span>
                   </button>
                 </div>
 
                 {/* Test Result Message */}
                 {testResult && (
                   <div
-                    className={`rounded-lg p-3 text-xs flex items-start gap-2 ${
+                    className={`rounded-lg p-3 text-meta flex items-start gap-2 ${
                       testResult.success
                         ? 'bg-emerald-50 border border-emerald-200 text-emerald-900'
                         : 'bg-red-50 border border-red-200 text-red-900'
@@ -348,60 +405,120 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     ) : (
                       <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
                     )}
-                    <span className="leading-relaxed">{testResult.message}</span>
+                    <span className="">{testResult.message}</span>
                   </div>
                 )}
+
+                {/* Weekly digest. Shares this card because it is the same
+                    channel and the same consent, but it has its own
+                    destination: a digest describes a week of private
+                    journalling and must never reach the shared team webhook. */}
+                <div className="space-y-4 border-t border-line-subtle pt-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <h3 className="text-ui font-semibold text-ink">Weekly digest</h3>
+                      <p className="mt-1 max-w-[62ch] text-ui text-ink-soft">
+                        Every Sunday evening, Gemini reads the week you wrote and sends you one
+                        short summary of what came up.
+                      </p>
+                    </div>
+
+                    <label className="relative mt-1 inline-flex shrink-0 cursor-pointer items-center">
+                      <input
+                        id="weekly-digest-toggle"
+                        type="checkbox"
+                        checked={settings.weeklyDigestEnabled}
+                        onChange={(e) =>
+                          setSettings((prev) => ({ ...prev, weeklyDigestEnabled: e.target.checked }))
+                        }
+                        className="peer sr-only"
+                      />
+                      <div className="peer h-6 w-11 rounded-full bg-muted-surface after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-line-strong after:bg-surface after:transition-transform after:duration-150 after:content-[''] peer-checked:bg-inverse peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ink motion-reduce:after:transition-none"></div>
+                    </label>
+                  </div>
+
+                  {settings.weeklyDigestEnabled && (
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="digest-webhook-input"
+                        className="block text-ui font-medium text-ink-secondary"
+                      >
+                        Your own Slack webhook
+                      </label>
+                      <input
+                        id="digest-webhook-input"
+                        type="url"
+                        inputMode="url"
+                        autoComplete="off"
+                        spellCheck={false}
+                        placeholder="https://hooks.slack.com/services/…"
+                        value={settings.digestWebhookUrl ?? ''}
+                        onChange={(e) =>
+                          setSettings((prev) => ({ ...prev, digestWebhookUrl: e.target.value }))
+                        }
+                        aria-invalid={digestBlocked}
+                        aria-describedby="digest-webhook-help"
+                        className={`${field} ${digestBlocked ? 'border-red-300!' : ''}`}
+                      />
+                      <p id="digest-webhook-help" className="max-w-[62ch] text-ui text-ink-muted">
+                        {digestBlocked
+                          ? 'Paste a Slack incoming webhook starting with https://hooks.slack.com/services/ — the digest has nowhere to go without one.'
+                          : 'Point this at a channel only you can read. Your digest goes here and nowhere else, never to the shared team channel.'}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Secret Manager Guide Accordion */}
-              <div className="rounded-xl border border-stone-200 bg-stone-50/60 p-4 space-y-3">
+              <div className={`${cardQuiet} space-y-3 p-4`}>
                 <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-semibold text-stone-800 flex items-center gap-1.5 font-sans">
-                    <span>Google Cloud Secret Manager Setup</span>
-                    <span className="text-[10px] text-stone-500 font-normal font-mono">(Matching GEMINI_API_KEY pattern)</span>
+                  <h4 className="text-meta font-semibold text-ink-body flex items-center gap-1.5">
+                    <span>Storing the webhook secret</span>
+                    <span className="text-meta text-ink-muted font-normal font-mono">(Matching GEMINI_API_KEY pattern)</span>
                   </h4>
                   <a
                     href="https://api.slack.com/messaging/webhooks"
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-[11px] text-stone-600 hover:text-stone-900 hover:underline"
+                    className="inline-flex items-center gap-1 text-meta text-ink-soft hover:text-ink hover:underline"
                   >
                     <span>Slack Webhook Docs</span>
                     <ExternalLink className="h-3 w-3" />
                   </a>
                 </div>
 
-                <p className="text-[11px] text-stone-600 leading-relaxed font-sans">
-                  To securely configure your incoming webhook without exposing it to client bundles, register <code className="font-mono bg-white px-1 py-0.5 rounded border border-stone-200 text-stone-800">SLACK_WEBHOOK_URL</code> in Google Cloud Secret Manager:
+                <p className="max-w-[62ch] text-ui text-ink-soft">
+                  To securely configure your incoming webhook without exposing it to client bundles, register <code className="font-mono bg-surface px-1 py-0.5 rounded border border-line text-ink-body">SLACK_WEBHOOK_URL</code> in Google Cloud Secret Manager:
                 </p>
 
                 {/* Bash Snippet 1 */}
                 <div className="space-y-1">
-                  <div className="flex items-center justify-between text-[10px] text-stone-500 font-mono">
+                  <div className="flex items-center justify-between text-meta text-ink-muted font-mono">
                     <span>1. Create secret container & add version:</span>
                     <button
                       type="button"
                       onClick={() =>
                         copyToClipboard(
-                          'gcloud secrets create SLACK_WEBHOOK_URL --replication-policy="automatic"\necho -n "https://hooks.slack.com/services/YOUR/WEBHOOK/URL" | gcloud secrets versions add SLACK_WEBHOOK_URL --data-file=-',
+                          'gcloud secrets create SLACK_WEBHOOK_URL --replication-policy="automatic"\necho -n"https://hooks.slack.com/services/YOUR/WEBHOOK/URL" | gcloud secrets versions add SLACK_WEBHOOK_URL --data-file=-',
                           'c1'
                         )
                       }
-                      className="inline-flex items-center gap-1 text-stone-600 hover:text-stone-900 cursor-pointer"
+                      className="inline-flex items-center gap-1 text-ink-soft hover:text-ink cursor-pointer"
                     >
                       {copiedCmd === 'c1' ? <CheckCheck className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
                       <span>{copiedCmd === 'c1' ? 'Copied' : 'Copy'}</span>
                     </button>
                   </div>
-                  <pre className="p-2.5 rounded-lg bg-stone-900 text-stone-200 text-[10.5px] font-mono overflow-x-auto leading-relaxed">
+                  <pre className="p-2.5 rounded-lg bg-inverse text-on-inverse-soft text-meta font-mono overflow-x-auto">
 {`gcloud secrets create SLACK_WEBHOOK_URL --replication-policy="automatic"
-echo -n "YOUR_SLACK_WEBHOOK_URL" | gcloud secrets versions add SLACK_WEBHOOK_URL --data-file=-`}
+echo -n"YOUR_SLACK_WEBHOOK_URL" | gcloud secrets versions add SLACK_WEBHOOK_URL --data-file=-`}
                   </pre>
                 </div>
 
                 {/* Bash Snippet 2 */}
                 <div className="space-y-1">
-                  <div className="flex items-center justify-between text-[10px] text-stone-500 font-mono">
+                  <div className="flex items-center justify-between text-meta text-ink-muted font-mono">
                     <span>2. Grant Cloud Run Service Account read permission:</span>
                     <button
                       type="button"
@@ -411,13 +528,13 @@ echo -n "YOUR_SLACK_WEBHOOK_URL" | gcloud secrets versions add SLACK_WEBHOOK_URL
                           'c2'
                         )
                       }
-                      className="inline-flex items-center gap-1 text-stone-600 hover:text-stone-900 cursor-pointer"
+                      className="inline-flex items-center gap-1 text-ink-soft hover:text-ink cursor-pointer"
                     >
                       {copiedCmd === 'c2' ? <CheckCheck className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
                       <span>{copiedCmd === 'c2' ? 'Copied' : 'Copy'}</span>
                     </button>
                   </div>
-                  <pre className="p-2.5 rounded-lg bg-stone-900 text-stone-200 text-[10.5px] font-mono overflow-x-auto leading-relaxed">
+                  <pre className="p-2.5 rounded-lg bg-inverse text-on-inverse-soft text-meta font-mono overflow-x-auto">
 {`PROJECT_NUMBER=$(gcloud projects describe $(gcloud config get-value project) --format="value(projectNumber)")
 gcloud secrets add-iam-policy-binding SLACK_WEBHOOK_URL \\
   --member="serviceAccount:\${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \\
@@ -427,7 +544,7 @@ gcloud secrets add-iam-policy-binding SLACK_WEBHOOK_URL \\
 
                 {/* Bash Snippet 3 */}
                 <div className="space-y-1">
-                  <div className="flex items-center justify-between text-[10px] text-stone-500 font-mono">
+                  <div className="flex items-center justify-between text-meta text-ink-muted font-mono">
                     <span>3. Bind secret to Cloud Run deploy:</span>
                     <button
                       type="button"
@@ -437,13 +554,13 @@ gcloud secrets add-iam-policy-binding SLACK_WEBHOOK_URL \\
                           'c3'
                         )
                       }
-                      className="inline-flex items-center gap-1 text-stone-600 hover:text-stone-900 cursor-pointer"
+                      className="inline-flex items-center gap-1 text-ink-soft hover:text-ink cursor-pointer"
                     >
                       {copiedCmd === 'c3' ? <CheckCheck className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
                       <span>{copiedCmd === 'c3' ? 'Copied' : 'Copy'}</span>
                     </button>
                   </div>
-                  <pre className="p-2.5 rounded-lg bg-stone-900 text-stone-200 text-[10.5px] font-mono overflow-x-auto leading-relaxed">
+                  <pre className="p-2.5 rounded-lg bg-inverse text-on-inverse-soft text-meta font-mono overflow-x-auto">
 {`gcloud run services update gemini-reflections \\
   --set-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest,SLACK_WEBHOOK_URL=SLACK_WEBHOOK_URL:latest"`}
                   </pre>
@@ -451,49 +568,7 @@ gcloud secrets add-iam-policy-binding SLACK_WEBHOOK_URL \\
               </div>
             </>
           )}
-        </div>
-
-        {/* Modal Footer */}
-        <div className="flex items-center justify-between border-t border-stone-200 bg-stone-50 px-6 py-4">
-          <div className="flex items-center">
-            {saveSuccess && (
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 animate-in fade-in">
-                <Check className="h-4 w-4 text-emerald-600" />
-                Notification preferences saved to Firestore!
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2.5">
-            <button
-              id="cancel-settings-btn"
-              type="button"
-              onClick={onClose}
-              className="rounded-lg border border-stone-200 bg-white px-4 py-2 text-xs font-medium text-stone-700 shadow-2xs hover:bg-stone-50 transition-colors cursor-pointer"
-            >
-              Close
-            </button>
-            <button
-              id="save-settings-btn"
-              type="button"
-              onClick={handleSave}
-              disabled={isSaving || isLoading}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-stone-900 px-4 py-2 text-xs font-medium text-white shadow-2xs hover:bg-stone-800 transition-colors disabled:opacity-50 cursor-pointer"
-            >
-              {isSaving ? (
-                <>
-                  <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  <span>Saving...</span>
-                </>
-              ) : (
-                <>
-                  <Check className="h-3.5 w-3.5" />
-                  <span>Save Preferences</span>
-                </>
-              )}
-            </button>
-          </div>
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 };

@@ -35,6 +35,15 @@ export interface JournalEntry {
 export interface NotificationSettings {
   slackEnabled: boolean;
   slackTriggerModes: JournalMode[];
+  /** Weekly digest, off unless the user turns it on and supplies their own webhook. */
+  weeklyDigestEnabled: boolean;
+  /**
+   * The user's own Slack incoming webhook. A digest summarises a week of private
+   * journalling, so it is never sent to the shared team channel that
+   * SLACK_WEBHOOK_URL points at — it goes only where this user chose.
+   * Treat as a bearer secret: never render it back in full, never log it.
+   */
+  digestWebhookUrl?: string;
   updatedAt?: number;
 }
 

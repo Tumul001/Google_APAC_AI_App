@@ -1,13 +1,13 @@
 import React from 'react';
 import {
-  Sparkles,
-  Lock,
-  Database,
+  AlertCircle,
   BrainCircuit,
-  MessageSquare,
-  ArrowRight,
-  ShieldCheck,
+  Bot,
   CheckCircle2,
+  Lock,
+  MapPin,
+  ShieldCheck,
+  User,
 } from 'lucide-react';
 
 interface LandingPageProps {
@@ -17,6 +17,48 @@ interface LandingPageProps {
   onOpenThreatModel: () => void;
 }
 
+const GoogleMark: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <path
+      fill="currentColor"
+      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+    />
+    <path
+      fill="currentColor"
+      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+    />
+    <path
+      fill="currentColor"
+      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+    />
+    <path
+      fill="currentColor"
+      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+    />
+  </svg>
+);
+
+const FEATURES = [
+  {
+    icon: BrainCircuit,
+    title: 'Multi-turn reflection',
+    body:
+      'Every turn stays in context. Switch between reflection, brainstorming, deep thinking and gratitude without starting over.',
+  },
+  {
+    icon: MapPin,
+    title: 'Place, only when you add it',
+    body:
+      'Tag an entry with a place you search for, or where you are right now. Untagged entries hold no location at all.',
+  },
+  {
+    icon: Lock,
+    title: 'Isolated to your account',
+    body:
+      'Entries are written to a Firestore path keyed to your account. The rules reject every read that is not yours. A coach sees an entry only after you share that entry.',
+  },
+];
+
 export const LandingPage: React.FC<LandingPageProps> = ({
   onSignIn,
   isLoading,
@@ -24,179 +66,174 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   onOpenThreatModel,
 }) => {
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] flex-col justify-between">
-      <main className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:py-16">
-        {errorMessage && (
-          <div className="mb-8 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 flex items-start gap-3">
-            <div className="h-5 w-5 text-red-600 shrink-0">⚠️</div>
-            <div>
-              <p className="font-medium">Authentication Notice</p>
-              <p className="mt-0.5 text-xs text-red-700">{errorMessage}</p>
+    <div className="flex min-h-[calc(100vh-4rem)] flex-col">
+      <main id="main-content">
+        {/* Hero — the page's one visual moment */}
+        <section className="relative isolate overflow-hidden border-b border-line/80">
+          <div className="landing-texture" aria-hidden="true" />
+
+          <div className="relative mx-auto max-w-6xl px-4 pt-14 pb-16 sm:px-6 sm:pt-20 sm:pb-24">
+            {errorMessage && (
+              <div
+                role="status"
+                aria-live="polite"
+                className="mb-10 flex max-w-2xl items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-ui text-red-800"
+              >
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" aria-hidden="true" />
+                <div className="min-w-0">
+                  <p className="font-semibold">Sign-in didn&rsquo;t complete</p>
+                  <p className="mt-0.5 break-words text-red-700">{errorMessage}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12 lg:gap-10">
+              {/* Left: the argument */}
+              <div className="lg:col-span-7">
+                <h1 className="text-[clamp(2.25rem,5.2vw,3.5rem)] font-bold leading-[1.08] tracking-tight text-ink text-pretty">
+                  <span className="block">Write it down.</span>
+                  <span className="block">
+                    Think it{' '}
+                    <em className="font-serif font-normal italic tracking-normal">through</em>.
+                  </span>
+                </h1>
+
+                <p className="mt-6 max-w-xl text-body text-ink-soft sm:text-title">
+                  Write an entry, then keep talking to it. Gemini reads the whole thread, so the
+                  fourth question knows what the first one said. Only your account can open any of it.
+                </p>
+
+                <div className="mt-9 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+                  <button
+                    id="google-signin-hero-btn"
+                    type="button"
+                    onClick={onSignIn}
+                    disabled={isLoading}
+                    className="inline-flex min-h-[3rem] cursor-pointer items-center justify-center gap-3 rounded-xl bg-inverse px-7 py-3.5 text-ui font-semibold text-surface shadow-2xs transition-[transform,background-color,box-shadow] duration-150 ease-out hover:-translate-y-px hover:bg-inverse-hover hover:shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+                  >
+                    {isLoading ? (
+                      <span
+                        className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent motion-reduce:animate-none"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <GoogleMark className="h-4 w-4" />
+                    )}
+                    <span>{isLoading ? 'Connecting to Google…' : 'Sign in with Google'}</span>
+                  </button>
+
+                  <button
+                    id="threat-model-hero-btn"
+                    type="button"
+                    onClick={onOpenThreatModel}
+                    className="inline-flex min-h-[3rem] cursor-pointer items-center justify-center gap-2 rounded-xl border border-line-strong bg-surface px-5 py-3.5 text-ui font-medium text-ink-secondary shadow-2xs transition-[background-color,border-color] duration-150 hover:border-line-emphasis hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                  >
+                    <ShieldCheck className="h-4 w-4 text-ink-muted" aria-hidden="true" />
+                    <span>Read the threat model</span>
+                  </button>
+                </div>
+
+                <p className="mt-5 text-ui text-ink-muted">
+                  Google sign-in only. This app never creates, sends or stores a password.
+                </p>
+              </div>
+
+              {/* Right: a specimen of the actual editor */}
+              <div className="lg:col-span-5" aria-hidden="true">
+                <div className="pointer-events-none select-none rounded-2xl border border-line/90 bg-surface p-4 shadow-xs sm:p-5">
+                  <div className="flex items-center justify-between gap-3 border-b border-line/80 pb-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-ui font-semibold text-ink">
+                        Thursday, after the review
+                      </p>
+                      <span className="mt-1 flex items-center gap-1 text-meta text-emerald-600">
+                        <CheckCircle2 className="h-3 w-3" /> Saved in Firestore
+                      </span>
+                    </div>
+                    <span className="shrink-0 rounded-md bg-subtle px-2.5 py-1 text-meta font-medium text-ink-secondary">
+                      Reflection
+                    </span>
+                  </div>
+
+                  <div className="mt-3 flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50/70 px-2.5 py-1.5 text-meta font-medium text-rose-800">
+                    <MapPin className="h-3.5 w-3.5 shrink-0 text-rose-600" />
+                    <span className="truncate">Cubbon Park, Bengaluru</span>
+                  </div>
+
+                  <div className="mt-4 space-y-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-muted-surface text-ink-secondary">
+                          <User className="h-3.5 w-3.5" />
+                        </span>
+                        <span className="text-meta font-semibold text-ink">You</span>
+                      </div>
+                      <p className="mt-1.5 pl-8 font-serif text-ui text-ink-body">
+                        The feedback was fair and I still took it badly. I want to understand why.
+                      </p>
+                    </div>
+
+                    <div className="border-t border-line-subtle/80 pt-3">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-inverse text-on-inverse">
+                          <Bot className="h-3.5 w-3.5" />
+                        </span>
+                        <span className="text-meta font-semibold text-ink">Gemini</span>
+                        <span className="text-meta text-ink-faint" translate="no">
+                          • gemini-3.6-flash
+                        </span>
+                      </div>
+                      <p className="mt-1.5 pl-8 font-serif text-ui text-ink-body">
+                        Separate the two for a moment. Which part stung — the substance of the note,
+                        or being seen not having caught it first?
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        )}
+        </section>
 
-        {/* Hero Section */}
-        <div className="text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-stone-300/80 bg-stone-100/90 px-3.5 py-1 text-xs font-medium text-stone-700 mb-6">
-            <Sparkles className="h-3.5 w-3.5 text-amber-600" />
-            <span>Private AI Reflection & Journaling Workspace</span>
-          </div>
-
-          <h1 className="text-4xl font-bold tracking-tight text-stone-900 sm:text-5xl lg:text-6xl font-serif">
-            Reflect deeper. Think clearer.
-          </h1>
-          <p className="mx-auto mt-4 max-w-2xl text-base sm:text-lg text-stone-600 leading-relaxed font-sans">
-            A conversational journal powered by <strong>Gemini 3.6 Flash</strong> and secured with{' '}
-            <strong>Cloud Firestore</strong>. Your thoughts, reflections, and insights remain
-            strictly isolated to your private account.
-          </p>
-
-          {/* Call to Action */}
-          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <button
-              id="google-signin-hero-btn"
-              onClick={onSignIn}
-              disabled={isLoading}
-              className="flex w-full sm:w-auto items-center justify-center gap-3 rounded-xl bg-stone-900 px-6 py-3.5 text-sm font-semibold text-white shadow-sm hover:bg-stone-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 transition-all disabled:opacity-60 cursor-pointer"
-            >
-              {isLoading ? (
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-              ) : (
-                <svg className="h-4 w-4" viewBox="0 0 24 24">
-                  <path
-                    fill="currentColor"
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  />
-                  <path
-                    fill="currentColor"
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  />
-                  <path
-                    fill="currentColor"
-                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                  />
-                  <path
-                    fill="currentColor"
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                  />
-                </svg>
-              )}
-              <span>{isLoading ? 'Connecting to Google...' : 'Sign in with Google'}</span>
-            </button>
-
-            <button
-              id="threat-model-hero-btn"
-              onClick={onOpenThreatModel}
-              className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl border border-stone-300 bg-white px-5 py-3.5 text-sm font-medium text-stone-700 shadow-2xs hover:bg-stone-50 transition-all cursor-pointer"
-            >
-              <ShieldCheck className="h-4 w-4 text-emerald-600" />
-              <span>Security & Threat Model</span>
-            </button>
-          </div>
-
-          <div className="mt-4 flex items-center justify-center gap-4 text-xs text-stone-500">
-            <span className="flex items-center gap-1">
-              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> No password storage required
-            </span>
-            <span className="flex items-center gap-1">
-              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> User-isolated Firestore
-            </span>
-          </div>
-        </div>
-
-        {/* Feature Cards Grid */}
-        <div className="mt-16 grid grid-cols-1 gap-6 sm:grid-cols-3">
-          <div className="rounded-2xl border border-stone-200/90 bg-white p-6 shadow-xs">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-stone-100 text-stone-800 mb-4">
-              <BrainCircuit className="h-5 w-5" />
-            </div>
-            <h2 className="text-base font-semibold text-stone-900">Gemini 3.6 Flash</h2>
-            <p className="mt-2 text-xs sm:text-sm text-stone-600 leading-relaxed">
-              Multi-turn contextual reflections, empathetic feedback, constructive brainstorming,
-              and structured insight summaries.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-stone-200/90 bg-white p-6 shadow-xs">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-stone-100 text-stone-800 mb-4">
-              <Database className="h-5 w-5" />
-            </div>
-            <h2 className="text-base font-semibold text-stone-900">Isolated Cloud Firestore</h2>
-            <p className="mt-2 text-xs sm:text-sm text-stone-600 leading-relaxed">
-              Every conversation and reflection is written to user-specific Firestore paths
-              enforced by strict security rules.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-stone-200/90 bg-white p-6 shadow-xs">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-stone-100 text-stone-800 mb-4">
-              <Lock className="h-5 w-5" />
-            </div>
-            <h2 className="text-base font-semibold text-stone-900">Zero-Secret Exposure</h2>
-            <p className="mt-2 text-xs sm:text-sm text-stone-600 leading-relaxed">
-              Gemini API keys stay protected on the secure Express backend with resilient model
-              fallback ladders.
-            </p>
-          </div>
-        </div>
-
-        {/* Workflow Showcase */}
-        <div className="mt-16 rounded-2xl border border-stone-200 bg-white p-6 sm:p-8 shadow-xs">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500">
-            How It Works
+        {/* Features — deliberately quieter than the hero */}
+        <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
+          <h2 className="max-w-2xl text-[clamp(1.5rem,3vw,2rem)] font-bold leading-tight tracking-tight text-ink text-pretty">
+            Built for how you{' '}
+            <em className="font-serif font-normal italic tracking-normal">reflect</em>.
           </h2>
-          <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-3">
-            <div className="flex gap-4">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-stone-900 text-xs font-semibold text-white">
-                1
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-stone-900">Sign in securely</h3>
-                <p className="mt-1 text-xs text-stone-600 leading-relaxed">
-                  Authenticate with Google Firebase Auth without transmitting passwords.
-                </p>
-              </div>
-            </div>
 
-            <div className="flex gap-4">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-stone-900 text-xs font-semibold text-white">
-                2
+          <dl className="mt-10 border-t border-line">
+            {FEATURES.map(({ icon: Icon, title, body }) => (
+              <div
+                key={title}
+                className="grid grid-cols-1 gap-x-10 gap-y-2 border-b border-line py-7 sm:grid-cols-12 sm:py-8"
+              >
+                <dt className="sm:col-span-4">
+                  <span className="flex items-center gap-2.5">
+                    <Icon className="h-4 w-4 shrink-0 text-ink-muted" aria-hidden="true" />
+                    <span className="text-body font-semibold text-ink">{title}</span>
+                  </span>
+                </dt>
+                <dd className="max-w-[58ch] font-serif text-body text-ink-soft sm:col-span-7">{body}</dd>
               </div>
-              <div>
-                <h3 className="text-sm font-medium text-stone-900">Journal & Converse</h3>
-                <p className="mt-1 text-xs text-stone-600 leading-relaxed">
-                  Write daily thoughts or brainstorm ideas with Gemini 3.6 Flash in multi-turn dialogues.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-stone-900 text-xs font-semibold text-white">
-                3
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-stone-900">Persistent History</h3>
-                <p className="mt-1 text-xs text-stone-600 leading-relaxed">
-                  Review past entries, extract summaries, and track your personal growth timeline.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+            ))}
+          </dl>
+        </section>
       </main>
 
-      <footer className="border-t border-stone-200/80 bg-white py-6">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 text-xs text-stone-500 sm:px-6">
-          <p>© 2026 Gemini Journal & Reflections. User authenticated & Cloud Firestore secured.</p>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={onOpenThreatModel}
-              className="text-stone-600 hover:text-stone-900 underline underline-offset-2"
-            >
-              Threat Analysis
-            </button>
-          </div>
+      <footer className="mt-auto border-t border-line/80 bg-surface">
+        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-8 text-ui text-ink-muted sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <p>
+            <span className="font-medium text-ink-secondary">Gemini Reflections</span>. Built on Firebase
+            Auth, Cloud Firestore and the Gemini API.
+          </p>
+          <button
+            type="button"
+            onClick={onOpenThreatModel}
+            className="inline-flex cursor-pointer items-center self-start rounded-md text-ink-soft underline decoration-line-strong underline-offset-4 transition-colors duration-150 hover:text-ink hover:decoration-ink-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink [@media(pointer:coarse)]:min-h-11 sm:self-auto"
+          >
+            Threat model
+          </button>
         </div>
       </footer>
     </div>

@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { APIProvider } from '@vis.gl/react-google-maps';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import {
   signInWithGoogle,
   signOut as appSignOut,
@@ -8,13 +7,35 @@ import {
 } from './lib/firebase';
 import { Navbar } from './components/Navbar';
 import { LandingPage } from './components/LandingPage';
-import { Dashboard } from './components/Dashboard';
-import { AdminDashboard } from './components/AdminDashboard';
-import { ThreatModelModal } from './components/ThreatModelModal';
-import { SettingsModal } from './components/SettingsModal';
 import type { UserProfile } from './types';
 
-const GOOGLE_MAPS_API_KEY = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) || '';
+/**
+ * Signed-out visitors reach only the landing page, so the editor, the coach
+ * workspace, the Maps SDK and the markdown renderer all load on demand rather
+ * than before first paint. The modals split too — most sessions never open them.
+ */
+const Dashboard = lazy(() =>
+  import('./components/Dashboard').then((m) => ({ default: m.Dashboard }))
+);
+const AdminDashboard = lazy(() =>
+  import('./components/AdminDashboard').then((m) => ({ default: m.AdminDashboard }))
+);
+const ThreatModelModal = lazy(() =>
+  import('./components/ThreatModelModal').then((m) => ({ default: m.ThreatModelModal }))
+);
+const SettingsModal = lazy(() =>
+  import('./components/SettingsModal').then((m) => ({ default: m.SettingsModal }))
+);
+
+const RouteFallback: React.FC = () => (
+  <div className="flex flex-1 items-center justify-center py-24" role="status">
+    <span
+      className="h-6 w-6 animate-spin rounded-full border-2 border-line-strong border-t-stone-800 motion-reduce:animate-none"
+      aria-hidden="true"
+    />
+    <span className="sr-only">Loading…</span>
+  </div>
+);
 
 export default function App() {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -114,18 +135,26 @@ export default function App() {
 
   if (isAuthLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-stone-50 text-stone-600">
+      <div className="flex min-h-screen items-center justify-center bg-canvas text-ink-soft">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-stone-800 border-t-transparent" />
-          <p className="text-xs font-medium text-stone-500">Checking secure authentication...</p>
+          <div
+            className="h-8 w-8 animate-spin rounded-full border-2 border-ink-body border-t-transparent motion-reduce:animate-none motion-reduce:border-t-stone-300"
+            aria-hidden="true"
+          />
+          <p className="text-meta font-medium text-ink-muted">Checking secure authentication...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
-      <div className="min-h-screen flex flex-col bg-stone-50 text-stone-900 font-sans">
+    <div className="min-h-screen flex flex-col bg-canvas text-ink font-sans">
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-inverse focus:px-4 focus:py-2 focus:text-ui focus:font-semibold focus:text-on-inverse"
+        >
+          Skip to main content
+        </a>
         <Navbar
           user={user}
           onSignOut={handleSignOut}
@@ -145,14 +174,18 @@ export default function App() {
           }}
           onOpenThreatModel={() => setIsThreatModelOpen(true)}
           onOpenSettings={() => setIsSettingsOpen(true)}
+          onSignIn={handleSignIn}
+          isSigningIn={isSigningIn}
         />
 
         {user ? (
-          currentPath === '/admin' && user.isAdmin ? (
-            <AdminDashboard user={user} onNavigateHome={() => navigateTo('/')} />
-          ) : (
-            <Dashboard user={user} />
-          )
+          <Suspense fallback={<RouteFallback />}>
+            {currentPath === '/admin' && user.isAdmin ? (
+              <AdminDashboard user={user} onNavigateHome={() => navigateTo('/')} />
+            ) : (
+              <Dashboard user={user} />
+            )}
+          </Suspense>
         ) : (
           <LandingPage
             onSignIn={handleSignIn}
@@ -162,19 +195,22 @@ export default function App() {
           />
         )}
 
-        <ThreatModelModal
-          isOpen={isThreatModelOpen}
-          onClose={() => setIsThreatModelOpen(false)}
-        />
+        <Suspense fallback={null}>
+          {isThreatModelOpen && (
+            <ThreatModelModal
+              isOpen={isThreatModelOpen}
+              onClose={() => setIsThreatModelOpen(false)}
+            />
+          )}
 
-        {user && (
-          <SettingsModal
-            isOpen={isSettingsOpen}
-            onClose={() => setIsSettingsOpen(false)}
-            user={user}
-          />
-        )}
+          {user && isSettingsOpen && (
+            <SettingsModal
+              isOpen={isSettingsOpen}
+              onClose={() => setIsSettingsOpen(false)}
+              user={user}
+            />
+          )}
+        </Suspense>
       </div>
-    </APIProvider>
   );
 }
